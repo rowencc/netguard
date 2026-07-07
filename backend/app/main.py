@@ -70,15 +70,17 @@ def sync_heartbeat(body: dict):
     finally:
         db.close()
 
+from fastapi import Body
+
 @app.post("/api/sync/report-devices")
-def sync_report_devices(body: list):
+def sync_report_devices(devices: list = Body(..., embed=False)):
     db = SessionLocal()
     try:
         new_devices = 0
         updated_devices = 0
         alerts_created = 0
 
-        for report in body:
+        for report in devices:
             mac = report.get("mac_address", "").upper()
             if not mac:
                 continue
