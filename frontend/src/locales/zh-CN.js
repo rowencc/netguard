@@ -82,7 +82,17 @@ export default {
     iot: 'IoT 设备',
     unknown: '未知',
     network: '路由器',
-    wireless: '路由器'
+    wireless: '路由器',
+    network_device: '网络设备',
+    printer: '打印机',
+    switch: '交换机',
+    server: '服务器',
+    tv: '电视',
+    speaker: '音箱',
+    tablet: '平板',
+    watch: '手表',
+    nas: 'NAS',
+    ap: '无线AP'
   },
   riskLevels: {
     low: '低',

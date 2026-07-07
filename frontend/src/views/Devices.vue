@@ -126,10 +126,13 @@
                   <option value="router">{{ t('deviceTypes.router') }}</option>
                   <option value="phone">{{ t('deviceTypes.phone') }}</option>
                   <option value="computer">{{ t('deviceTypes.computer') }}</option>
+                  <option value="printer">{{ t('deviceTypes.printer') }}</option>
+                  <option value="network_device">{{ t('deviceTypes.network_device') }}</option>
+                  <option value="switch">{{ t('deviceTypes.switch') }}</option>
+                  <option value="server">{{ t('deviceTypes.server') }}</option>
+                  <option value="tv">{{ t('deviceTypes.tv') }}</option>
+                  <option value="speaker">{{ t('deviceTypes.speaker') }}</option>
                   <option value="iot">{{ t('deviceTypes.iot') }}</option>
-                  <option value="printer">打印机</option>
-                  <option value="switch">交换机</option>
-                  <option value="server">服务器</option>
                   <option value="unknown">{{ t('deviceTypes.unknown') }}</option>
                 </select>
               </span>
@@ -388,6 +391,12 @@ export default {
         router: 'tag--primary',
         phone: 'tag--success',
         computer: 'tag--warning',
+        printer: 'tag--warning',
+        network_device: 'tag--primary',
+        switch: 'tag--primary',
+        server: 'tag--warning',
+        tv: 'tag--info',
+        speaker: 'tag--info',
         iot: 'tag--info'
       }
       return map[type] || 'tag--info'

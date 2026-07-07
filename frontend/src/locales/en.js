@@ -79,7 +79,17 @@ export default {
     iot: 'IoT',
     unknown: 'Unknown',
     network: 'Router',
-    wireless: 'Router'
+    wireless: 'Router',
+    network_device: 'Network Device',
+    printer: 'Printer',
+    switch: 'Switch',
+    server: 'Server',
+    tv: 'TV',
+    speaker: 'Speaker',
+    tablet: 'Tablet',
+    watch: 'Watch',
+    nas: 'NAS',
+    ap: 'Wireless AP'
   },
   riskLevels: {
     low: 'LOW',
