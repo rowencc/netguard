@@ -32,11 +32,17 @@ def get_devices(
     skip: int = 0,
     limit: int = 100,
     risk_level: Optional[str] = None,
+    scan_source: Optional[str] = None,
+    client_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     query = db.query(Device)
     if risk_level:
         query = query.filter(Device.risk_level == risk_level)
+    if scan_source:
+        query = query.filter(Device.scan_source == scan_source)
+    if client_id:
+        query = query.filter(Device.client_id == client_id)
     devices = query.offset(skip).limit(limit).all()
     return [
         {
@@ -52,6 +58,8 @@ def get_devices(
             "ssid": getattr(d, 'ssid', '') or '',
             "risk_level": d.risk_level,
             "is_authorized": d.is_authorized,
+            "client_id": d.client_id or '',
+            "scan_source": d.scan_source or 'server',
             "first_seen": d.first_seen.isoformat() if d.first_seen else None,
             "last_seen": d.last_seen.isoformat() if d.last_seen else None
         }
@@ -550,7 +558,8 @@ def check_devices_online(db: Session = Depends(get_db)):
     from app.services.platform_compat import ping_host
 
     devices = db.query(Device).filter(
-        (Device.ip_address != None) & (Device.ip_address != "")
+        (Device.ip_address != None) & (Device.ip_address != "") &
+        (Device.scan_source == "client")
     ).all()
 
     if not devices:

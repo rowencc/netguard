@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app.models.alert import Alert
+from app.models.device import Device
 from app.services.alerter import AlertService
 
 router = APIRouter()
@@ -16,7 +17,7 @@ def get_alerts(
     severity: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Alert)
+    query = db.query(Alert).join(Device, Alert.device_id == Device.id).filter(Device.scan_source == "client")
     if acknowledged is not None:
         query = query.filter(Alert.acknowledged == acknowledged)
     if severity:
@@ -37,9 +38,10 @@ def get_alerts(
 
 @router.get("/stats")
 def get_alert_stats(db: Session = Depends(get_db)):
-    total = db.query(Alert).count()
-    unacknowledged = db.query(Alert).filter(Alert.acknowledged == False).count()
-    critical = db.query(Alert).filter(Alert.severity == "CRITICAL").count()
+    query = db.query(Alert).join(Device, Alert.device_id == Device.id).filter(Device.scan_source == "client")
+    total = query.count()
+    unacknowledged = query.filter(Alert.acknowledged == False).count()
+    critical = query.filter(Alert.severity == "CRITICAL").count()
     return {"total": total, "unacknowledged": unacknowledged, "critical": critical}
 
 @router.put("/{alert_id}/ack")

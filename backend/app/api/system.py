@@ -14,10 +14,11 @@ SCRIPT_DIR = Path(__file__).parent.parent.parent
 
 @router.get("/stats")
 def get_system_stats(db: Session = Depends(get_db)):
-    device_count = db.query(Device).count()
+    device_count = db.query(Device).filter(Device.scan_source == "client").count()
     alert_count = db.query(Alert).filter(Alert.acknowledged == False).count()
     risk_devices = db.query(Device).filter(
-        Device.risk_level.in_(["HIGH", "CRITICAL"])
+        Device.risk_level.in_(["HIGH", "CRITICAL"]),
+        Device.scan_source == "client"
     ).count()
     return {
         "device_count": device_count,

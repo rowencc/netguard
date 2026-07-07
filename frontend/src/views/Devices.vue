@@ -251,7 +251,10 @@ export default {
     async loadDevices() {
       this.loading = true
       try {
-        const params = this.filterRisk ? { risk_level: this.filterRisk } : {}
+        const params = { scan_source: 'client' }
+        if (this.filterRisk) {
+          params.risk_level = this.filterRisk
+        }
         const res = await api.get('/devices/', { params })
         this.devices = res.data
         this.checkOnline()
