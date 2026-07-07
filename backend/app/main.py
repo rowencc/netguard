@@ -9,6 +9,13 @@ from app.api import devices, alerts, system, libraries
 from app.ws_manager import manager
 from app.database import engine, SessionLocal, Base
 from app.models import Device, Alert, ScanRecord, Client
+from app.services.vendor_lookup import VendorLookup
+from app.services.identifier import DeviceIdentifier
+from app.services.alerter import AlertService
+
+vendor_lookup = VendorLookup()
+identifier = DeviceIdentifier()
+alerter = AlertService()
 
 app = FastAPI(
     title=config["app"]["name"],
@@ -86,17 +93,36 @@ def sync_report_devices(devices: list = Body(..., embed=False)):
                 continue
 
             client_id = report.get("client_id", "")
+
+            vendor_name = vendor_lookup.lookup(mac) or ""
+
+            dev_data = {
+                "mac_address": mac,
+                "ip_address": report.get("ip_address", ""),
+                "hostname": report.get("hostname", ""),
+                "vendor": vendor_name,
+                "device_type": report.get("device_type", ""),
+            }
+            identified = identifier.identify_device(dev_data)
+
+            final_vendor = vendor_name or report.get("vendor", "")
+            final_type = identified.get("device_type", report.get("device_type", "unknown"))
+            final_risk = identified.get("risk_level", report.get("risk_level", "LOW"))
+
             existing = db.query(Device).filter(Device.mac_address == mac).first()
 
             if existing:
                 existing.ip_address = report.get("ip_address", existing.ip_address)
                 existing.hostname = report.get("hostname") or existing.hostname
-                existing.vendor = report.get("vendor") or existing.vendor
-                existing.device_type = report.get("device_type") or existing.device_type
-                existing.risk_level = report.get("risk_level", existing.risk_level)
+                if final_vendor:
+                    existing.vendor = final_vendor
+                if final_type:
+                    existing.device_type = final_type
+                existing.risk_level = final_risk
                 existing.last_seen = func.now()
                 existing.client_id = client_id
                 existing.scan_source = "client"
+                device_id = existing.id
                 updated_devices += 1
             else:
                 mac_prefix = mac[:8] if len(mac) >= 8 else mac
@@ -105,16 +131,27 @@ def sync_report_devices(devices: list = Body(..., embed=False)):
                     mac_prefix=mac_prefix,
                     ip_address=report.get("ip_address", ""),
                     hostname=report.get("hostname", ""),
-                    vendor=report.get("vendor", ""),
-                    device_type=report.get("device_type", "unknown"),
-                    risk_level=report.get("risk_level", "LOW"),
+                    vendor=final_vendor,
+                    device_type=final_type,
+                    risk_level=final_risk,
                     client_id=client_id,
                     scan_source="client",
                 )
                 db.add(new_device)
+                db.flush()
+                device_id = new_device.id
                 new_devices += 1
 
-            if report.get("risk_level") in ("HIGH", "CRITICAL"):
+            if final_risk in ("HIGH", "CRITICAL"):
+                hostname_display = report.get("hostname") or "--"
+                vendor_display = final_vendor or "未知厂商"
+                message = f"发现高风险设备: {final_type} ({vendor_display}) IP: {report.get('ip_address', '')} 主机名: {hostname_display}"
+                alerter.create_alert(
+                    device_id=device_id,
+                    alert_type="high_risk_device",
+                    severity="WARNING" if final_risk == "HIGH" else "CRITICAL",
+                    message=message,
+                )
                 alerts_created += 1
 
         db.commit()
