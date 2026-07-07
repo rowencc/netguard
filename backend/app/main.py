@@ -36,6 +36,107 @@ def startup():
 def root():
     return {"message": "NetGuard API"}
 
+@app.get("/api/health")
+def health():
+    return {"status": "healthy"}
+
+@app.post("/api/sync/heartbeat")
+def sync_heartbeat(body: dict):
+    db = SessionLocal()
+    try:
+        client_id = body.get("client_id", "")
+        client = db.query(Client).filter(Client.client_id == client_id).first()
+        if not client:
+            client = Client(client_id=client_id)
+            db.add(client)
+        client.hostname = body.get("hostname", "")
+        client.ip_address = body.get("ip_address", "")
+        client.platform = body.get("platform", "")
+        client.version = body.get("version", "")
+        client.device_count = body.get("device_count", 0)
+        client.online_count = body.get("online_count", 0)
+        client.last_heartbeat = func.now()
+        client.is_online = True
+        db.commit()
+
+        if client_id not in manager._client_info:
+            manager._client_info[client_id] = {
+                "hostname": client.hostname,
+                "ip_address": client.ip_address,
+                "platform": client.platform,
+            }
+
+        return {"status": "ok", "server_time": datetime.now().isoformat()}
+    finally:
+        db.close()
+
+@app.post("/api/sync/report-devices")
+def sync_report_devices(body: list):
+    db = SessionLocal()
+    try:
+        new_devices = 0
+        updated_devices = 0
+        alerts_created = 0
+
+        for report in body:
+            mac = report.get("mac_address", "").upper()
+            if not mac:
+                continue
+
+            client_id = report.get("client_id", "")
+            existing = db.query(Device).filter(Device.mac_address == mac).first()
+
+            if existing:
+                existing.ip_address = report.get("ip_address", existing.ip_address)
+                existing.hostname = report.get("hostname") or existing.hostname
+                existing.vendor = report.get("vendor") or existing.vendor
+                existing.device_type = report.get("device_type") or existing.device_type
+                existing.risk_level = report.get("risk_level", existing.risk_level)
+                existing.last_seen = func.now()
+                existing.client_id = client_id
+                existing.scan_source = "client"
+                updated_devices += 1
+            else:
+                mac_prefix = mac[:8] if len(mac) >= 8 else mac
+                new_device = Device(
+                    mac_address=mac,
+                    mac_prefix=mac_prefix,
+                    ip_address=report.get("ip_address", ""),
+                    hostname=report.get("hostname", ""),
+                    vendor=report.get("vendor", ""),
+                    device_type=report.get("device_type", "unknown"),
+                    risk_level=report.get("risk_level", "LOW"),
+                    client_id=client_id,
+                    scan_source="client",
+                )
+                db.add(new_device)
+                new_devices += 1
+
+            if report.get("risk_level") in ("HIGH", "CRITICAL"):
+                alerts_created += 1
+
+        db.commit()
+        return {
+            "status": "ok",
+            "new_devices": new_devices,
+            "updated_devices": updated_devices,
+            "alerts_created": alerts_created,
+        }
+    finally:
+        db.close()
+
+@app.get("/api/sync/commands/{client_id}")
+def sync_commands(client_id: str):
+    db = SessionLocal()
+    try:
+        client = db.query(Client).filter(Client.client_id == client_id).first()
+        if client:
+            client.last_heartbeat = func.now()
+            db.commit()
+    finally:
+        db.close()
+    return {"commands": [], "config": {"scan_interval": 300, "alert_threshold": "MEDIUM"}}
+
 @app.get("/api/clients")
 def list_clients():
     db = SessionLocal()
