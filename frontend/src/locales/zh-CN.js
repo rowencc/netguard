@@ -48,7 +48,10 @@ export default {
     lookup: '查询',
     lookupResult: '查询结果',
     lookupFailed: '查询失败',
-    foundDevices: '发现 {count} 台设备'
+    foundDevices: '发现 {count} 台设备',
+    clickToEdit: '点击编辑',
+    save: '保存',
+    cancel: '取消'
   },
   clients: {
     title: '在线客户端',

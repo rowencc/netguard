@@ -5,13 +5,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
 from app.config import config
-from app.api import devices, alerts, system, libraries
+from app.api import devices, alerts, system, libraries, corrections
 from app.ws_manager import manager
 from app.database import engine, SessionLocal, Base
 from app.models import Device, Alert, ScanRecord, Client
 from app.services.vendor_lookup import VendorLookup
 from app.services.identifier import DeviceIdentifier
 from app.services.alerter import AlertService
+from app.api.corrections import get_learned_vendor, get_learned_device_type
 
 vendor_lookup = VendorLookup()
 identifier = DeviceIdentifier()
@@ -33,6 +34,7 @@ app.include_router(devices.router, prefix="/api/devices", tags=["devices"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(libraries.router, prefix="/api/libraries", tags=["libraries"])
+app.include_router(corrections.router, prefix="/api/corrections", tags=["corrections"])
 
 @app.on_event("startup")
 def startup():
@@ -92,7 +94,10 @@ def sync_report_devices(devices: list = Body(..., embed=False)):
 
             client_id = report.get("client_id", "")
 
-            vendor_name = vendor_lookup.lookup(mac) or ""
+            learned_vendor = get_learned_vendor(mac[:8], db)
+            learned_type = get_learned_device_type(mac[:8], db)
+            
+            vendor_name = learned_vendor or vendor_lookup.lookup(mac) or ""
 
             dev_data = {
                 "mac_address": mac,
@@ -104,7 +109,7 @@ def sync_report_devices(devices: list = Body(..., embed=False)):
             identified = identifier.identify_device(dev_data)
 
             final_vendor = vendor_name or report.get("vendor", "")
-            final_type = identified.get("device_type", report.get("device_type", "unknown"))
+            final_type = learned_type or identified.get("device_type", report.get("device_type", "unknown"))
             final_risk = identified.get("risk_level", report.get("risk_level", "LOW"))
 
             existing = db.query(Device).filter(Device.mac_address == mac).first()

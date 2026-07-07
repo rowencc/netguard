@@ -103,6 +103,7 @@
             <th>{{ t('devices.risk') }}</th>
             <th>{{ t('devices.status') }}</th>
             <th>{{ t('devices.lastSeen') }}</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -110,10 +111,30 @@
             <td><code class="mono">{{ device.ip_address }}</code></td>
             <td><code class="mono">{{ device.mac_address }}</code></td>
             <td class="cell-name">{{ device.hostname || '--' }}</td>
-            <td class="cell-vendor">{{ device.vendor || '--' }}</td>
+            <td class="cell-vendor" @click="startEdit(device, 'vendor')">
+              <span v-if="editingDevice?.id === device.id && editingField === 'vendor'">
+                <input v-model="editValue" class="inline-edit" @keyup.enter="saveEdit(device)" @keyup.escape="cancelEdit" ref="editInput" />
+              </span>
+              <span v-else :class="{ 'editable': true, 'unknown-value': !device.vendor }">
+                {{ device.vendor || t('devices.clickToEdit') }}
+              </span>
+            </td>
             <td>
-              <span class="tag" :class="getDeviceTypeClass(device.device_type)">
-                {{ t('deviceTypes.' + device.device_type) || device.device_type || 'unknown' }}
+              <span v-if="editingDevice?.id === device.id && editingField === 'device_type'" class="inline-select-wrap">
+                <select v-model="editValue" class="inline-edit" @change="saveEdit(device)" @keyup.escape="cancelEdit">
+                  <option value="camera">{{ t('deviceTypes.camera') }}</option>
+                  <option value="router">{{ t('deviceTypes.router') }}</option>
+                  <option value="phone">{{ t('deviceTypes.phone') }}</option>
+                  <option value="computer">{{ t('deviceTypes.computer') }}</option>
+                  <option value="iot">{{ t('deviceTypes.iot') }}</option>
+                  <option value="printer">打印机</option>
+                  <option value="switch">交换机</option>
+                  <option value="server">服务器</option>
+                  <option value="unknown">{{ t('deviceTypes.unknown') }}</option>
+                </select>
+              </span>
+              <span v-else class="tag editable" :class="getDeviceTypeClass(device.device_type)" @click="startEdit(device, 'device_type')">
+                {{ t('deviceTypes.' + device.device_type) || device.device_type || t('devices.clickToEdit') }}
               </span>
             </td>
             <td>
@@ -127,6 +148,10 @@
               </span>
             </td>
             <td class="cell-time">{{ formatTime(device.last_seen) }}</td>
+            <td class="cell-actions">
+              <button v-if="editingDevice?.id === device.id" class="btn-icon btn-save" @click="saveEdit(device)" :title="t('devices.save')">&#10003;</button>
+              <button v-if="editingDevice?.id === device.id" class="btn-icon btn-cancel" @click="cancelEdit" :title="t('devices.cancel')">&#10007;</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -207,6 +232,9 @@ export default {
       scanDevices: [],
       scanId: null,
       removeWsHandler: null,
+      editingDevice: null,
+      editingField: '',
+      editValue: '',
     }
   },
   computed: {
@@ -293,6 +321,32 @@ export default {
       } catch (e) {
         console.error('Lookup failed:', e)
         this.lookupResult = null
+      }
+    },
+    startEdit(device, field) {
+      this.editingDevice = device
+      this.editingField = field
+      this.editValue = device[field] || ''
+    },
+    cancelEdit() {
+      this.editingDevice = null
+      this.editingField = ''
+      this.editValue = ''
+    },
+    async saveEdit(device) {
+      if (!this.editValue.trim()) return
+      try {
+        await api.post('/corrections/correct', {
+          mac_address: device.mac_address,
+          field_name: this.editingField,
+          new_value: this.editValue.trim(),
+          old_value: device[this.editingField] || '',
+        })
+        device[this.editingField] = this.editValue.trim()
+        this.cancelEdit()
+        this.loadDevices()
+      } catch (e) {
+        console.error('Save correction failed:', e)
       }
     },
     async scanNetwork() {
@@ -619,6 +673,66 @@ export default {
 .cell-name { color: var(--color-ink); font-weight: 500; }
 .cell-vendor { color: var(--color-ink-subtle); }
 .cell-time { color: var(--color-ink-tertiary); font-size: 13px; }
+
+.cell-actions { width: 60px; text-align: center; }
+
+.editable {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--color-ink-subtle);
+  padding-bottom: 1px;
+}
+
+.editable:hover {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.unknown-value {
+  color: var(--color-ink-tertiary);
+  font-style: italic;
+}
+
+.inline-edit {
+  padding: 2px 6px;
+  border: 1px solid var(--color-primary-focus);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: var(--color-surface-1);
+  color: var(--color-ink);
+  width: 120px;
+}
+
+.inline-select-wrap .inline-edit {
+  width: 100px;
+}
+
+.btn-icon {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.btn-save {
+  background: var(--color-success);
+  color: white;
+}
+
+.btn-save:hover { background: #1e8449; }
+
+.btn-cancel {
+  background: var(--color-surface-3);
+  color: var(--color-ink-subtle);
+  margin-left: 4px;
+}
+
+.btn-cancel:hover { background: var(--color-hairline); }
 
 .tag {
   display: inline-flex;
