@@ -21,7 +21,7 @@ class ServerReporter:
         self.ctx.check_hostname = False
         self.ctx.verify_mode = ssl.CERT_NONE
     
-    def _request(self, method: str, path: str, data: dict = None) -> dict:
+    def _request(self, method: str, path: str, data: dict = None, timeout: int = 30) -> dict:
         url = f"{self.server_url}{path}"
         
         headers = {
@@ -34,7 +34,7 @@ class ServerReporter:
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
         
         try:
-            response = urllib.request.urlopen(req, timeout=10, context=self.ctx)
+            response = urllib.request.urlopen(req, timeout=timeout, context=self.ctx)
             return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             error_body = e.read().decode("utf-8") if e.read() else ""
@@ -78,7 +78,17 @@ class ServerReporter:
                 "os_info": dev.get("os_info", ""),
             })
         
-        return self._request("POST", "/api/sync/report-devices", report)
+        batch_size = 20
+        total_new = 0
+        total_updated = 0
+        
+        for i in range(0, len(report), batch_size):
+            batch = report[i:i + batch_size]
+            result = self._request("POST", "/api/sync/report-devices", batch, timeout=30)
+            total_new += result.get("new_devices", 0)
+            total_updated += result.get("updated_devices", 0)
+        
+        return {"status": "ok", "new_devices": total_new, "updated_devices": total_updated}
     
     def get_commands(self) -> dict:
         return self._request("GET", f"/api/sync/commands/{self.client_id}")
