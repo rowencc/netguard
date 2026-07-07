@@ -16,6 +16,7 @@ from app.api.corrections import get_learned_vendor, get_learned_device_type
 
 vendor_lookup = VendorLookup()
 identifier = DeviceIdentifier()
+alerter_service = AlertService()
 
 app = FastAPI(
     title=config["app"]["name"],
@@ -144,6 +145,37 @@ def sync_report_devices(devices: list = Body(..., embed=False)):
                 db.flush()
                 device_id = new_device.id
                 new_devices += 1
+
+            if final_risk in ("HIGH", "CRITICAL"):
+                hostname_display = report.get("hostname") or "--"
+                vendor_display = final_vendor or "未知厂商"
+                message = f"发现高风险设备: {final_type} ({vendor_display}) IP: {report.get('ip_address', '')} 主机名: {hostname_display}"
+                try:
+                    existing_alert = db.query(Alert).filter(
+                        Alert.device_id == device_id,
+                        Alert.acknowledged == False
+                    ).first()
+                    if not existing_alert:
+                        alerter_service.create_alert(
+                            device_id=device_id,
+                            alert_type="high_risk_device",
+                            severity="WARNING" if final_risk == "HIGH" else "CRITICAL",
+                            message=message,
+                        )
+                        import asyncio
+                        try:
+                            loop = asyncio.get_event_loop()
+                            loop.create_task(manager.broadcast_to_frontends({
+                                "type": "alert",
+                                "severity": final_risk,
+                                "message": message,
+                                "device_type": final_type,
+                                "ip_address": report.get("ip_address", ""),
+                            }))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
         db.commit()
         return {
