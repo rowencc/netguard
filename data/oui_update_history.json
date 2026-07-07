@@ -1,0 +1,47 @@
+[
+  {
+    "timestamp": "2026-06-16 16:35:21",
+    "ieee": 39522,
+    "wireshark": 0,
+    "nmap": 38938,
+    "merged_total": 39534
+  },
+  {
+    "timestamp": "2026-06-17 11:59:17",
+    "ieee": 39526,
+    "wireshark": 0,
+    "nmap": 38938,
+    "merged_total": 39538
+  },
+  {
+    "timestamp": "2026-06-17 13:02:53",
+    "ieee": 39526,
+    "wireshark": 0,
+    "nmap": 38938,
+    "merged_total": 39538
+  },
+  {
+    "timestamp": "2026-06-17 13:13:29",
+    "ieee": 39526,
+    "nmap": 38938,
+    "merged_total": 39538
+  },
+  {
+    "timestamp": "2026-06-17 13:18:32",
+    "ieee": 39526,
+    "nmap": 38938,
+    "merged_total": 39538
+  },
+  {
+    "timestamp": "2026-07-03 17:27:22",
+    "ieee": 39688,
+    "nmap": 38938,
+    "merged_total": 39700
+  },
+  {
+    "timestamp": "2026-07-03 17:27:52",
+    "ieee": 39688,
+    "nmap": 38938,
+    "merged_total": 39700
+  }
+]

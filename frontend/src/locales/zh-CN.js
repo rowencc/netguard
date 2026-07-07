@@ -1,0 +1,108 @@
+export default {
+  nav: {
+    dashboard: '仪表盘',
+    devices: '设备',
+    alerts: '告警',
+    libraries: '同步库',
+    systemOnline: '系统在线'
+  },
+  dashboard: {
+    title: '仪表盘',
+    subtitle: '网络概览',
+    totalDevices: '设备总数',
+    activeAlerts: '活跃告警',
+    riskDevices: '风险设备',
+    quickActions: '快捷操作',
+    scanNetwork: '扫描网络',
+    scanDesc: '发现新设备',
+    viewAlerts: '查看告警',
+    alertDesc: '查看通知'
+  },
+  devices: {
+    title: '设备',
+    subtitle: '发现 {count} 台设备',
+    refresh: '刷新',
+    checking: '探活中...',
+    scan: '扫描网络',
+    scanning: '扫描中...',
+    allRisk: '所有风险等级',
+    ip: 'IP 地址',
+    mac: 'MAC 地址',
+    name: '设备名称',
+    vendor: '厂商',
+    type: '类型',
+    risk: '风险',
+    status: '状态',
+    lastSeen: '最后发现',
+    authorized: '已授权',
+    online: '在线',
+    idle: '空闲',
+    offline: '离线',
+    unknown: '未知',
+    noDevices: '未发现设备',
+    noDevicesHint: '点击"扫描网络"发现设备',
+    scanFailed: '扫描失败',
+    loadFailed: '加载设备列表失败',
+    lookupTitle: 'MAC 地址查询',
+    lookupPlaceholder: '输入 MAC 地址（如 AA:BB:CC:DD:EE:FF）',
+    lookup: '查询',
+    lookupResult: '查询结果',
+    lookupFailed: '查询失败'
+  },
+  alerts: {
+    title: '告警',
+    subtitle: '{count} 条通知',
+    refresh: '刷新',
+    severity: '严重级别',
+    type: '类型',
+    message: '消息',
+    time: '时间',
+    action: '操作',
+    acknowledge: '确认',
+    acknowledged: '已确认',
+    noAlerts: '暂无告警',
+    noAlertsHint: '所有系统运行正常',
+    ackFailed: '确认告警失败',
+    loadFailed: '加载告警列表失败'
+  },
+  deviceTypes: {
+    camera: '摄像头',
+    router: '路由器',
+    phone: '手机',
+    computer: '电脑',
+    iot: 'IoT 设备',
+    unknown: '未知',
+    network: '路由器',
+    wireless: '路由器'
+  },
+  riskLevels: {
+    low: '低',
+    medium: '中',
+    high: '高',
+    critical: '严重'
+  },
+  notification: {
+    newAlert: '新告警',
+    highRiskDetected: '检测到高风险设备',
+    criticalAlert: '严重告警'
+  },
+  libraries: {
+    title: '同步库',
+    subtitle: '管理 OUI 和厂商数据库',
+    updateAll: '全部更新',
+    updating: '更新中...',
+    update: '更新',
+    updated: '已更新',
+    updateSuccess: '更新完成',
+    updateFailed: '更新失败',
+    totalEntries: '总记录数',
+    lastFullUpdate: '最后更新',
+    entries: '条记录',
+    localOnly: '本地维护',
+    status: {
+      active: '正常',
+      empty: '空',
+      missing: '缺失'
+    }
+  }
+}

@@ -1,0 +1,108 @@
+export default {
+  nav: {
+    dashboard: 'Dashboard',
+    devices: 'Devices',
+    alerts: 'Alerts',
+    libraries: 'Libraries',
+    systemOnline: 'System Online'
+  },
+  dashboard: {
+    title: 'Dashboard',
+    subtitle: 'Network overview',
+    totalDevices: 'Total Devices',
+    activeAlerts: 'Active Alerts',
+    riskDevices: 'Risk Devices',
+    quickActions: 'Quick Actions',
+    scanNetwork: 'Scan Network',
+    scanDesc: 'Discover new devices',
+    viewAlerts: 'View Alerts',
+    alertDesc: 'Check notifications'
+  },
+  devices: {
+    title: 'Devices',
+    subtitle: '{count} devices found',
+    refresh: 'Refresh',
+    checking: 'Checking...',
+    scan: 'Scan Network',
+    scanning: 'Scanning...',
+    allRisk: 'All Risk Levels',
+    ip: 'IP Address',
+    mac: 'MAC Address',
+    name: 'Device Name',
+    vendor: 'Vendor',
+    type: 'Type',
+    risk: 'Risk',
+    status: 'Status',
+    lastSeen: 'Last Seen',
+    authorized: 'Authorized',
+    online: 'Online',
+    idle: 'Idle',
+    offline: 'Offline',
+    unknown: 'Unknown',
+    noDevices: 'No devices found',
+    noDevicesHint: 'Click "Scan Network" to discover devices',
+    scanFailed: 'Scan failed',
+    loadFailed: 'Failed to load devices',
+    lookupTitle: 'MAC Lookup',
+    lookupPlaceholder: 'Enter MAC address (e.g. AA:BB:CC:DD:EE:FF)',
+    lookup: 'Query',
+    lookupResult: 'Query Result',
+    lookupFailed: 'Query failed'
+  },
+  alerts: {
+    title: 'Alerts',
+    subtitle: '{count} notifications',
+    refresh: 'Refresh',
+    severity: 'Severity',
+    type: 'Type',
+    message: 'Message',
+    time: 'Time',
+    action: 'Action',
+    acknowledge: 'Acknowledge',
+    acknowledged: 'Acknowledged',
+    noAlerts: 'No alerts',
+    noAlertsHint: 'All systems operating normally',
+    ackFailed: 'Failed to acknowledge alert',
+    loadFailed: 'Failed to load alerts'
+  },
+  deviceTypes: {
+    camera: 'Camera',
+    router: 'Router',
+    phone: 'Phone',
+    computer: 'Computer',
+    iot: 'IoT',
+    unknown: 'Unknown',
+    network: 'Router',
+    wireless: 'Router'
+  },
+  riskLevels: {
+    low: 'LOW',
+    medium: 'MEDIUM',
+    high: 'HIGH',
+    critical: 'CRITICAL'
+  },
+  notification: {
+    newAlert: 'New Alert',
+    highRiskDetected: 'High-risk device detected',
+    criticalAlert: 'Critical alert'
+  },
+  libraries: {
+    title: 'Libraries',
+    subtitle: 'Manage OUI and vendor databases',
+    updateAll: 'Update All',
+    updating: 'Updating...',
+    update: 'Update',
+    updated: 'updated',
+    updateSuccess: 'Update completed',
+    updateFailed: 'Update failed',
+    totalEntries: 'Total Entries',
+    lastFullUpdate: 'Last Update',
+    entries: 'entries',
+    localOnly: 'Local Only',
+    status: {
+      active: 'Active',
+      empty: 'Empty',
+      missing: 'Missing'
+    }
+  }
+}
