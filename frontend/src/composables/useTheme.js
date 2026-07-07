@@ -1,4 +1,4 @@
-import { reactive, watch, onMounted } from 'vue'
+import { reactive, computed, onMounted } from 'vue'
 
 const STORAGE_KEY = 'netguard-theme'
 const CUSTOM_COLORS_KEY = 'netguard-custom-colors'
@@ -37,15 +37,18 @@ function applyTheme() {
     document.documentElement.style.setProperty(`--color-${key}`, value)
   })
 
-  const r = parseInt(state.customColors.primary.slice(1, 3), 16)
-  const g = parseInt(state.customColors.primary.slice(3, 5), 16)
-  const b = parseInt(state.customColors.primary.slice(5, 7), 16)
-  document.documentElement.style.setProperty('--color-primary-rgb', `${r}, ${g}, ${b}`)
+  const hex = state.customColors.primary
+  if (hex && hex.length === 7) {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    document.documentElement.style.setProperty('--color-primary-rgb', `${r}, ${g}, ${b}`)
+  }
 }
 
-function setMode(mode) {
-  state.mode = mode
-  localStorage.setItem(STORAGE_KEY, mode)
+function setMode(newMode) {
+  state.mode = newMode
+  localStorage.setItem(STORAGE_KEY, newMode)
   applyTheme()
 }
 
@@ -66,8 +69,12 @@ function toggleTheme() {
   setMode(current === 'dark' ? 'light' : 'dark')
 }
 
+let initialized = false
+
 export function useTheme() {
-  onMounted(() => {
+  if (!initialized) {
+    initialized = true
+
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       state.mode = saved
@@ -89,12 +96,14 @@ export function useTheme() {
         }
       })
     }
-  })
+  }
+
+  const mode = computed(() => state.mode)
+  const customColors = computed(() => ({ ...state.customColors }))
 
   return {
-    mode: () => state.mode,
-    customColors: () => state.customColors,
-    effectiveTheme: getEffectiveTheme,
+    mode,
+    customColors,
     setMode,
     setCustomColor,
     resetColors,
