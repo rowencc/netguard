@@ -1,0 +1,8 @@
+{
+  "server_url": "https://net.soccn.com",
+  "api_key": "netguard-sync-key-2024",
+  "client_id": "client-desktop-001",
+  "scan_interval": 300,
+  "scan_subnets": [],
+  "use_websocket": true
+}

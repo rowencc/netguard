@@ -40,6 +40,25 @@
       </div>
     </div>
 
+    <!-- Client Selection -->
+    <ClientList
+      v-if="wsClients.length > 0"
+      :clients="wsClients"
+      :selected-client-id="selectedClientId"
+      @select="selectClient"
+    />
+
+    <!-- Scan Progress -->
+    <div v-if="scanStatus" class="scan-progress">
+      <div class="scan-status">
+        <span class="spinner"></span>
+        <span>{{ scanStatus }}</span>
+      </div>
+      <div v-if="scanDevices.length > 0" class="scan-count">
+        {{ t('devices.foundDevices', { count: scanDevices.length }) }}
+      </div>
+    </div>
+
     <header class="page-header">
       <div class="header-left">
         <h1 class="page-title">{{ t('devices.title') }}</h1>
@@ -87,19 +106,19 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="device in devices" :key="device.id" class="table-row">
+          <tr v-for="device in displayDevices" :key="device.id || device.mac_address" class="table-row">
             <td><code class="mono">{{ device.ip_address }}</code></td>
             <td><code class="mono">{{ device.mac_address }}</code></td>
             <td class="cell-name">{{ device.hostname || '--' }}</td>
             <td class="cell-vendor">{{ device.vendor || '--' }}</td>
             <td>
               <span class="tag" :class="getDeviceTypeClass(device.device_type)">
-                {{ t('deviceTypes.' + device.device_type) || device.device_type }}
+                {{ t('deviceTypes.' + device.device_type) || device.device_type || 'unknown' }}
               </span>
             </td>
             <td>
-              <span class="risk-badge" :class="'risk--' + device.risk_level.toLowerCase()">
-                {{ t('riskLevels.' + device.risk_level.toLowerCase()) || device.risk_level }}
+              <span class="risk-badge" :class="'risk--' + (device.risk_level || 'low').toLowerCase()">
+                {{ t('riskLevels.' + (device.risk_level || 'low').toLowerCase()) || device.risk_level }}
               </span>
             </td>
             <td>
@@ -115,11 +134,11 @@
 
     <!-- Mobile Cards -->
     <div class="card-list mobile-only">
-      <div v-for="device in devices" :key="device.id" class="device-card">
+      <div v-for="device in displayDevices" :key="device.id || device.mac_address" class="device-card">
         <div class="card-header">
           <code class="mono card-ip">{{ device.ip_address }}</code>
-          <span class="risk-badge" :class="'risk--' + device.risk_level.toLowerCase()">
-            {{ t('riskLevels.' + device.risk_level.toLowerCase()) || device.risk_level }}
+          <span class="risk-badge" :class="'risk--' + (device.risk_level || 'low').toLowerCase()">
+            {{ t('riskLevels.' + (device.risk_level || 'low').toLowerCase()) || device.risk_level }}
           </span>
         </div>
         <div class="card-body">
@@ -138,7 +157,7 @@
           <div class="card-row">
             <span class="row-label">{{ t('devices.type') }}</span>
             <span class="tag" :class="getDeviceTypeClass(device.device_type)">
-              {{ t('deviceTypes.' + device.device_type) || device.device_type }}
+              {{ t('deviceTypes.' + device.device_type) || device.device_type || 'unknown' }}
             </span>
           </div>
           <div class="card-row">
@@ -151,7 +170,7 @@
       </div>
     </div>
 
-    <div v-if="devices.length === 0 && !loading" class="empty-state">
+    <div v-if="displayDevices.length === 0 && !loading" class="empty-state">
       <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
@@ -164,11 +183,15 @@
 <script>
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
+import { useWebSocket } from '@/composables/useWebSocket'
+import ClientList from '@/components/ClientList.vue'
 
 export default {
+  components: { ClientList },
   setup() {
     const { t } = useI18n()
-    return { t }
+    const { connected, clients: wsClients, scanProgress, requestScan, onMessage } = useWebSocket()
+    return { t, wsConnected: connected, wsClients, scanProgress, requestScan, onMessage }
   },
   data() {
     return {
@@ -178,13 +201,53 @@ export default {
       checking: false,
       filterRisk: '',
       lookupMac: '',
-      lookupResult: null
+      lookupResult: null,
+      selectedClientId: '',
+      scanStatus: '',
+      scanDevices: [],
+      scanId: null,
+      removeWsHandler: null,
+    }
+  },
+  computed: {
+    displayDevices() {
+      if (this.scanDevices.length > 0 && this.scanning) {
+        return this.scanDevices
+      }
+      return this.devices
     }
   },
   mounted() {
     this.loadDevices()
+    this.removeWsHandler = this.onMessage(this.handleWsMessage)
+  },
+  beforeUnmount() {
+    if (this.removeWsHandler) {
+      this.removeWsHandler()
+    }
   },
   methods: {
+    handleWsMessage(data) {
+      if (data.type === 'scan_progress' && data.scan_id === this.scanId) {
+        const progress = data.data
+        if (progress.status === 'device_found') {
+          const device = progress.device
+          if (!this.scanDevices.find(d => d.mac_address === device.mac_address)) {
+            this.scanDevices.push(device)
+          }
+          this.scanStatus = this.t('devices.scanning') + '... ' + this.scanDevices.length
+        } else if (progress.status === 'complete') {
+          this.scanStatus = ''
+          this.scanning = false
+          this.scanDevices = []
+          this.scanId = null
+          this.loadDevices()
+        }
+      }
+    },
+    selectClient(clientId) {
+      this.selectedClientId = this.selectedClientId === clientId ? '' : clientId
+    },
     async loadDevices() {
       this.loading = true
       try {
@@ -231,12 +294,34 @@ export default {
     },
     async scanNetwork() {
       this.scanning = true
+      this.scanDevices = []
+      this.scanStatus = this.t('devices.scanning') + '...'
+
+      if (this.selectedClientId && this.wsConnected) {
+        try {
+          const res = await api.post('/devices/scan-client', {
+            client_id: this.selectedClientId,
+          })
+          this.scanId = res.data.scan_id
+          this.scanStatus = this.t('devices.scanning') + '...'
+        } catch (e) {
+          console.error('Client scan failed:', e)
+          this.scanStatus = ''
+          this.scanning = false
+          await this.scanServerSide()
+        }
+      } else {
+        await this.scanServerSide()
+      }
+    },
+    async scanServerSide() {
       try {
         await api.post('/devices/scan')
         await this.loadDevices()
       } catch (e) {
         console.error('Scan failed:', e)
       } finally {
+        this.scanStatus = ''
         this.scanning = false
       }
     },
@@ -253,6 +338,11 @@ export default {
     getOnlineStatus(device) {
       if (device._is_online !== undefined) {
         return device._is_online
+          ? { class: 'status--online', text: this.t('devices.online') }
+          : { class: 'status--offline', text: this.t('devices.offline') }
+      }
+      if (device.is_online !== undefined) {
+        return device.is_online
           ? { class: 'status--online', text: this.t('devices.online') }
           : { class: 'status--offline', text: this.t('devices.offline') }
       }
@@ -348,25 +438,11 @@ export default {
   gap: var(--space-sm);
 }
 
-.result-card.result--camera {
-  border-left: 3px solid var(--color-danger);
-}
-
-.result-card.result--router {
-  border-left: 3px solid var(--color-primary);
-}
-
-.result-card.result--phone {
-  border-left: 3px solid var(--color-success);
-}
-
-.result-card.result--computer {
-  border-left: 3px solid var(--color-warning);
-}
-
-.result-card.result--iot {
-  border-left: 3px solid var(--color-ink-subtle);
-}
+.result-card.result--camera { border-left: 3px solid var(--color-danger); }
+.result-card.result--router { border-left: 3px solid var(--color-primary); }
+.result-card.result--phone { border-left: 3px solid var(--color-success); }
+.result-card.result--computer { border-left: 3px solid var(--color-warning); }
+.result-card.result--iot { border-left: 3px solid var(--color-ink-subtle); }
 
 .result-row {
   display: flex;
@@ -376,19 +452,34 @@ export default {
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.result-row:last-child {
-  border-bottom: none;
+.result-row:last-child { border-bottom: none; }
+
+.result-label { font-size: 13px; color: var(--color-ink-subtle); }
+.result-value { font-size: 14px; color: var(--color-ink); font-weight: 500; }
+
+/* Scan Progress */
+.scan-progress {
+  background: rgba(94, 106, 210, 0.1);
+  border: 1px solid var(--color-primary-focus);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.result-label {
+.scan-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 14px;
+  color: var(--color-primary);
+}
+
+.scan-count {
   font-size: 13px;
   color: var(--color-ink-subtle);
-}
-
-.result-value {
-  font-size: 14px;
-  color: var(--color-ink);
-  font-weight: 500;
 }
 
 .page-header {
@@ -439,24 +530,15 @@ export default {
   white-space: nowrap;
 }
 
-.btn svg {
-  width: 16px;
-  height: 16px;
-}
+.btn svg { width: 16px; height: 16px; }
 
 .btn-primary {
   background: var(--color-primary);
   color: var(--color-on-primary);
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-secondary {
   background: var(--color-surface-2);
@@ -478,13 +560,9 @@ export default {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.filters {
-  margin-bottom: var(--space-md);
-}
+.filters { margin-bottom: var(--space-md); }
 
 .filter-select {
   padding: 8px 12px;
@@ -503,11 +581,6 @@ export default {
   box-shadow: 0 0 0 2px rgba(94, 106, 210, 0.2);
 }
 
-.filter-select option {
-  background: var(--color-surface-1);
-  color: var(--color-ink);
-}
-
 .table-container {
   background: var(--color-surface-1);
   border: 1px solid var(--color-hairline);
@@ -515,10 +588,7 @@ export default {
   overflow: hidden;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
+.data-table { width: 100%; border-collapse: collapse; }
 
 .data-table th {
   padding: 12px 16px;
@@ -539,32 +609,13 @@ export default {
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.table-row:hover {
-  background: var(--color-surface-2);
-}
+.table-row:hover { background: var(--color-surface-2); }
+.table-row:last-child td { border-bottom: none; }
 
-.table-row:last-child td {
-  border-bottom: none;
-}
-
-.mono {
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
-.cell-name {
-  color: var(--color-ink);
-  font-weight: 500;
-}
-
-.cell-vendor {
-  color: var(--color-ink-subtle);
-}
-
-.cell-time {
-  color: var(--color-ink-tertiary);
-  font-size: 13px;
-}
+.mono { font-family: var(--font-mono); font-size: 13px; }
+.cell-name { color: var(--color-ink); font-weight: 500; }
+.cell-vendor { color: var(--color-ink-subtle); }
+.cell-time { color: var(--color-ink-tertiary); font-size: 13px; }
 
 .tag {
   display: inline-flex;
@@ -574,30 +625,11 @@ export default {
   font-weight: 500;
 }
 
-.tag--primary {
-  background: rgba(94, 106, 210, 0.15);
-  color: var(--color-primary);
-}
-
-.tag--success {
-  background: rgba(39, 166, 68, 0.15);
-  color: var(--color-success);
-}
-
-.tag--warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--color-warning);
-}
-
-.tag--danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-danger);
-}
-
-.tag--info {
-  background: var(--color-surface-3);
-  color: var(--color-ink-subtle);
-}
+.tag--primary { background: rgba(94, 106, 210, 0.15); color: var(--color-primary); }
+.tag--success { background: rgba(39, 166, 68, 0.15); color: var(--color-success); }
+.tag--warning { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
+.tag--danger { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); }
+.tag--info { background: var(--color-surface-3); color: var(--color-ink-subtle); }
 
 .risk-badge {
   display: inline-flex;
@@ -609,25 +641,10 @@ export default {
   letter-spacing: 0.3px;
 }
 
-.risk--low {
-  background: rgba(39, 166, 68, 0.15);
-  color: var(--color-success);
-}
-
-.risk--medium {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--color-warning);
-}
-
-.risk--high {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-danger);
-}
-
-.risk--critical {
-  background: var(--color-danger);
-  color: white;
-}
+.risk--low { background: rgba(39, 166, 68, 0.15); color: var(--color-success); }
+.risk--medium { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
+.risk--high { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); }
+.risk--critical { background: var(--color-danger); color: white; }
 
 .status-indicator {
   display: inline-flex;
@@ -643,25 +660,11 @@ export default {
   border-radius: 50%;
 }
 
-.status--authorized::before,
-.status--online::before {
-  background: var(--color-success);
-}
+.status--online::before { background: var(--color-success); }
+.status--idle::before { background: var(--color-warning); }
+.status--offline::before { background: var(--color-ink-tertiary); }
 
-.status--idle::before {
-  background: var(--color-warning);
-}
-
-.status--offline::before,
-.status--unknown::before {
-  background: var(--color-ink-tertiary);
-}
-
-.card-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
+.card-list { display: flex; flex-direction: column; gap: var(--space-sm); }
 
 .device-card {
   background: var(--color-surface-1);
@@ -679,15 +682,9 @@ export default {
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.card-ip {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-ink);
-}
+.card-ip { font-size: 15px; font-weight: 500; color: var(--color-ink); }
 
-.card-body {
-  padding: var(--space-md);
-}
+.card-body { padding: var(--space-md); }
 
 .card-row {
   display: flex;
@@ -697,19 +694,9 @@ export default {
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.card-row:last-child {
-  border-bottom: none;
-}
-
-.row-label {
-  font-size: 13px;
-  color: var(--color-ink-subtle);
-}
-
-.row-value {
-  font-size: 13px;
-  color: var(--color-ink-muted);
-}
+.card-row:last-child { border-bottom: none; }
+.row-label { font-size: 13px; color: var(--color-ink-subtle); }
+.row-value { font-size: 13px; color: var(--color-ink-muted); }
 
 .empty-state {
   display: flex;
@@ -727,59 +714,20 @@ export default {
   margin-bottom: var(--space-md);
 }
 
-.empty-text {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--color-ink-muted);
-  margin-bottom: var(--space-xs);
-}
+.empty-text { font-size: 16px; font-weight: 500; color: var(--color-ink-muted); margin-bottom: var(--space-xs); }
+.empty-hint { font-size: 14px; color: var(--color-ink-subtle); }
 
-.empty-hint {
-  font-size: 14px;
-  color: var(--color-ink-subtle);
-}
-
-.desktop-only {
-  display: block;
-}
-
-.mobile-only {
-  display: none;
-}
+.desktop-only { display: block; }
+.mobile-only { display: none; }
 
 @media (max-width: 768px) {
-  .desktop-only {
-    display: none !important;
-  }
-
-  .mobile-only {
-    display: flex !important;
-  }
-
-  .page-header {
-    flex-direction: column;
-  }
-
-  .header-actions {
-    width: 100%;
-  }
-
-  .header-actions .btn {
-    flex: 1;
-    justify-content: center;
-  }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .lookup-input-group {
-    flex-direction: column;
-  }
-
-  .lookup-input-group .btn {
-    width: 100%;
-    justify-content: center;
-  }
+  .desktop-only { display: none !important; }
+  .mobile-only { display: flex !important; }
+  .page-header { flex-direction: column; }
+  .header-actions { width: 100%; }
+  .header-actions .btn { flex: 1; justify-content: center; }
+  .page-title { font-size: 24px; }
+  .lookup-input-group { flex-direction: column; }
+  .lookup-input-group .btn { width: 100%; justify-content: center; }
 }
 </style>

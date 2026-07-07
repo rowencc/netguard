@@ -19,6 +19,8 @@ class Device(Base):
     last_seen = Column(DateTime, default=func.now(), onupdate=func.now())
     risk_level = Column(Enum('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'), default='LOW')
     is_authorized = Column(Boolean, default=False)
+    client_id = Column(String(100), index=True)
+    scan_source = Column(String(20), default='server')
     notes = Column(String(500))
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

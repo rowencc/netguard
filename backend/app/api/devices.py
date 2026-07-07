@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 from typing import List, Optional
 from app.database import get_db
 from app.models.device import Device
+from app.models.scan_record import ScanRecord
 from app.services.scanner import NetworkScanner
 from app.services.identifier import DeviceIdentifier
 from app.services.vendor_lookup import VendorLookup
@@ -598,3 +599,122 @@ def check_devices_online(db: Session = Depends(get_db)):
         "online_count": len(online_ids),
         "total_count": len(devices),
     }
+
+
+@router.post("/scan-client")
+async def scan_client(body: dict, db: Session = Depends(get_db)):
+    from app.ws_manager import manager
+    import uuid
+
+    client_id = body.get("client_id")
+    subnets = body.get("subnets", [])
+
+    if not client_id:
+        raise HTTPException(status_code=400, detail="client_id is required")
+
+    if not manager.is_client_online(client_id):
+        raise HTTPException(status_code=400, detail=f"Client {client_id} is not connected")
+
+    scan_id = str(uuid.uuid4())
+
+    record = ScanRecord(
+        scan_id=scan_id,
+        scan_type="client",
+        client_id=client_id,
+        status="pending",
+    )
+    db.add(record)
+    db.commit()
+
+    sent = await manager.send_to_client(client_id, {
+        "type": "scan_command",
+        "scan_id": scan_id,
+        "subnets": subnets,
+    })
+
+    if not sent:
+        raise HTTPException(status_code=500, detail="Failed to send command to client")
+
+    return {"status": "pending", "scan_id": scan_id, "client_id": client_id}
+
+
+@router.post("/scan-browser")
+def scan_browser(body: dict, db: Session = Depends(get_db)):
+    client_ip = body.get("client_ip", "")
+
+    if not client_ip:
+        raise HTTPException(status_code=400, detail="client_ip is required")
+
+    ip_parts = client_ip.split(".")
+    if len(ip_parts) != 4:
+        raise HTTPException(status_code=400, detail="Invalid IP format")
+
+    subnet = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.0/24"
+
+    existing_devices = db.query(Device).all()
+    existing_macs = {d.mac_address.upper(): d for d in existing_devices}
+
+    devices = scanner.scan_network(subnet)
+    new_count = 0
+    scanned = 0
+    alerts_created = 0
+
+    for dev_data in devices:
+        mac = dev_data.get("mac_address", "")
+        if not mac:
+            continue
+        scanned += 1
+        identified = identifier.identify_device(dev_data)
+        ip = dev_data["ip_address"]
+        vendor = identified.get("vendor", "")
+        device_type = identified.get("device_type", "unknown")
+        risk_level = identified.get("risk_level", "LOW")
+        hostname = dev_data.get("hostname", "")
+        hostname_source = dev_data.get("hostname_source", "")
+
+        existing = existing_macs.get(mac.upper())
+        if existing:
+            existing.last_seen = func.now()
+            existing.ip_address = ip
+            if hostname:
+                existing.hostname = hostname
+                existing.hostname_source = hostname_source
+            if vendor:
+                existing.vendor = vendor
+            if device_type:
+                existing.device_type = device_type
+            if risk_level:
+                existing.risk_level = risk_level
+            existing.scan_source = "browser"
+            device_id = existing.id
+        else:
+            new_device = Device(
+                mac_address=mac,
+                mac_prefix=mac[:8],
+                vendor=vendor,
+                device_type=device_type,
+                ip_address=ip,
+                hostname=hostname,
+                hostname_source=hostname_source,
+                risk_level=risk_level,
+                scan_source="browser",
+            )
+            db.add(new_device)
+            db.flush()
+            device_id = new_device.id
+            new_count += 1
+
+        if risk_level in ("HIGH", "CRITICAL"):
+            hostname_display = hostname or "--"
+            vendor_display = vendor or "未知厂商"
+            message = f"发现高风险设备: {device_type} ({vendor_display}) IP: {ip} 主机名: {hostname_display}"
+            alerter.create_alert(
+                device_id=device_id,
+                alert_type="high_risk_device",
+                severity="WARNING" if risk_level == "HIGH" else "CRITICAL",
+                message=message,
+            )
+            alerts_created += 1
+
+    db.commit()
+    return {"device_count": scanned, "new_device_count": new_count, "alerts_created": alerts_created}

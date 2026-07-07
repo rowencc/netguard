@@ -47,7 +47,13 @@ export default {
     lookupPlaceholder: 'Enter MAC address (e.g. AA:BB:CC:DD:EE:FF)',
     lookup: 'Query',
     lookupResult: 'Query Result',
-    lookupFailed: 'Query failed'
+    lookupFailed: 'Query failed',
+    foundDevices: '{count} devices found'
+  },
+  clients: {
+    title: 'Online Clients',
+    noClients: 'No online clients',
+    devices: 'devices'
   },
   alerts: {
     title: 'Alerts',

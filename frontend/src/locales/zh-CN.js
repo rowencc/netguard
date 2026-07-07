@@ -47,7 +47,13 @@ export default {
     lookupPlaceholder: '输入 MAC 地址（如 AA:BB:CC:DD:EE:FF）',
     lookup: '查询',
     lookupResult: '查询结果',
-    lookupFailed: '查询失败'
+    lookupFailed: '查询失败',
+    foundDevices: '发现 {count} 台设备'
+  },
+  clients: {
+    title: '在线客户端',
+    noClients: '暂无在线客户端',
+    devices: '台设备'
   },
   alerts: {
     title: '告警',
