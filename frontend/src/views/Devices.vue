@@ -48,17 +48,6 @@
       @select="selectClient"
     />
 
-    <!-- Scan Progress -->
-    <div v-if="scanStatus" class="scan-progress">
-      <div class="scan-status">
-        <span class="spinner"></span>
-        <span>{{ scanStatus }}</span>
-      </div>
-      <div v-if="scanDevices.length > 0" class="scan-count">
-        {{ t('devices.foundDevices', { count: scanDevices.length }) }}
-      </div>
-    </div>
-
     <header class="page-header">
       <div class="header-left">
         <h1 class="page-title">{{ t('devices.title') }}</h1>
@@ -231,7 +220,6 @@ export default {
       lookupMac: '',
       lookupResult: null,
       selectedClientId: '',
-      scanStatus: '',
       scanDevices: [],
       scanId: null,
       removeWsHandler: null,
@@ -266,9 +254,7 @@ export default {
           if (!this.scanDevices.find(d => d.mac_address === device.mac_address)) {
             this.scanDevices.push(device)
           }
-          this.scanStatus = this.t('devices.scanning') + '... ' + this.scanDevices.length
         } else if (progress.status === 'complete') {
-          this.scanStatus = ''
           this.scanning = false
           this.scanDevices = []
           this.scanId = null
@@ -355,7 +341,6 @@ export default {
     async scanNetwork() {
       this.scanning = true
       this.scanDevices = []
-      this.scanStatus = this.t('devices.scanning') + '...'
 
       if (this.selectedClientId && this.wsConnected) {
         try {
@@ -363,10 +348,8 @@ export default {
             client_id: this.selectedClientId,
           })
           this.scanId = res.data.scan_id
-          this.scanStatus = this.t('devices.scanning') + '...'
         } catch (e) {
           console.error('Client scan failed:', e)
-          this.scanStatus = ''
           this.scanning = false
           await this.scanServerSide()
         }
@@ -381,7 +364,6 @@ export default {
       } catch (e) {
         console.error('Scan failed:', e)
       } finally {
-        this.scanStatus = ''
         this.scanning = false
       }
     },
@@ -523,30 +505,6 @@ export default {
 .result-label { font-size: 13px; color: var(--color-ink-subtle); }
 .result-value { font-size: 14px; color: var(--color-ink); font-weight: 500; }
 
-/* Scan Progress */
-.scan-progress {
-  background: rgba(94, 106, 210, 0.1);
-  border: 1px solid var(--color-primary-focus);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md);
-  margin-bottom: var(--space-lg);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.scan-status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: 14px;
-  color: var(--color-primary);
-}
-
-.scan-count {
-  font-size: 13px;
-  color: var(--color-ink-subtle);
-}
 
 .page-header {
   display: flex;

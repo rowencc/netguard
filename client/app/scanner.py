@@ -16,6 +16,16 @@ from typing import List, Dict, Generator
 class LocalScanner:
     def __init__(self):
         self.platform = sys.platform
+
+    @staticmethod
+    def normalize_mac(mac: str) -> str:
+        if not mac:
+            return ""
+        mac = mac.upper().replace("-", ":").replace(".", ":")
+        parts = mac.split(":")
+        if len(parts) != 6:
+            return mac
+        return ":".join(p.zfill(2) for p in parts)
     
     def scan_network(self, subnets: List[str] = None) -> List[Dict]:
         devices = []
@@ -138,7 +148,7 @@ class LocalScanner:
             
             for sent, received in result:
                 ip = received.psrc
-                mac = received.hwsrc.upper()
+                mac = self.normalize_mac(received.hwsrc)
                 hostname = self._reverse_dns(ip)
                 devices.append({
                     "ip_address": ip,
@@ -163,7 +173,7 @@ class LocalScanner:
             
             for host in nm.all_hosts():
                 if "mac" in nm[host].get("addresses", {}):
-                    mac = nm[host]["addresses"]["mac"].upper()
+                    mac = self.normalize_mac(nm[host]["addresses"]["mac"])
                     hostname = nm[host].hostname() or self._reverse_dns(host)
                     devices.append({
                         "ip_address": host,
@@ -205,12 +215,12 @@ class LocalScanner:
                         parts = line.split()
                         if len(parts) >= 4:
                             ip = parts[1].strip("()")
-                            mac = parts[3]
-                            if "incomplete" in mac.lower() or mac == "ff:ff:ff:ff:ff:ff":
+                            mac = self.normalize_mac(parts[3])
+                            if "incomplete" in mac.lower() or mac == "FF:FF:FF:FF:FF:FF":
                                 continue
                             devices.append({
                                 "ip_address": ip,
-                                "mac_address": mac.upper(),
+                                "mac_address": mac,
                                 "hostname": self._reverse_dns(ip),
                                 "vendor": "",
                                 "device_type": ""
@@ -227,12 +237,12 @@ class LocalScanner:
                     parts = line.split()
                     if len(parts) >= 4:
                         ip = parts[1].strip("()")
-                        mac = parts[3]
-                        if "incomplete" in mac.lower() or mac == "ff:ff:ff:ff:ff:ff":
+                        mac = self.normalize_mac(parts[3])
+                        if "incomplete" in mac.lower() or mac == "FF:FF:FF:FF:FF:FF":
                             continue
                         devices.append({
                             "ip_address": ip,
-                            "mac_address": mac.upper(),
+                            "mac_address": mac,
                             "hostname": self._reverse_dns(ip),
                             "vendor": "",
                             "device_type": ""

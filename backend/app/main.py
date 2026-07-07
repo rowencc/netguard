@@ -82,6 +82,17 @@ def sync_heartbeat(body: dict):
 from fastapi import Body
 
 @app.post("/api/sync/report-devices")
+def normalize_mac(mac: str) -> str:
+    if not mac:
+        return ""
+    mac = mac.upper().replace("-", ":").replace(".", ":")
+    parts = mac.split(":")
+    if len(parts) != 6:
+        return mac
+    return ":".join(p.zfill(2) for p in parts)
+
+
+@app.post("/api/sync/report-devices")
 def sync_report_devices(devices: list = Body(..., embed=False)):
     db = SessionLocal()
     try:
@@ -89,7 +100,7 @@ def sync_report_devices(devices: list = Body(..., embed=False)):
         updated_devices = 0
 
         for report in devices:
-            mac = report.get("mac_address", "").upper()
+            mac = normalize_mac(report.get("mac_address", ""))
             if not mac:
                 continue
 
