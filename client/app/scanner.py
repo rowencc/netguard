@@ -3,11 +3,13 @@ Local Network Scanner
 
 本地网络扫描器，用于发现网络设备
 支持 macOS 和 Linux
+支持 ARP 表扫描 + 主动探测（scapy/nmap）
 """
 
 import subprocess
 import sys
 import socket
+import ipaddress
 from typing import List, Dict, Generator
 
 
@@ -25,6 +27,19 @@ class LocalScanner:
                 seen.add(d["ip_address"])
                 devices.append(d)
         
+        if not subnets:
+            subnets = self._detect_subnets()
+        
+        for subnet in subnets:
+            try:
+                active_devices = self._active_scan(subnet)
+                for d in active_devices:
+                    if d["ip_address"] not in seen:
+                        seen.add(d["ip_address"])
+                        devices.append(d)
+            except Exception:
+                pass
+        
         return devices
     
     def scan_network_stream(self, subnets: List[str] = None) -> Generator[Dict, None, None]:
@@ -34,8 +49,144 @@ class LocalScanner:
         for d in arp_devices:
             if d["ip_address"] not in seen:
                 seen.add(d["ip_address"])
-                d["is_online"] = self.ping_host(d["ip_address"])
+                d["is_online"] = True
                 yield d
+        
+        if not subnets:
+            subnets = self._detect_subnets()
+        
+        for subnet in subnets:
+            try:
+                active_devices = self._active_scan(subnet)
+                for d in active_devices:
+                    if d["ip_address"] not in seen:
+                        seen.add(d["ip_address"])
+                        d["is_online"] = True
+                        yield d
+            except Exception:
+                pass
+    
+    def _detect_subnets(self) -> List[str]:
+        subnets = []
+        try:
+            if self.platform == "darwin":
+                result = subprocess.run(
+                    ["ifconfig"],
+                    capture_output=True, text=True, timeout=5
+                )
+                for line in result.stdout.splitlines():
+                    if "inet " in line and "127.0.0.1" not in line:
+                        parts = line.split()
+                        for i, p in enumerate(parts):
+                            if p == "inet":
+                                ip = parts[i + 1]
+                                try:
+                                    iface_ip = ipaddress.ip_address(ip)
+                                    if iface_ip.is_private:
+                                        net = ipaddress.ip_network(f"{ip}/24", strict=False)
+                                        subnets.append(str(net))
+                                except ValueError:
+                                    pass
+            else:
+                result = subprocess.run(
+                    ["ip", "-4", "addr", "show"],
+                    capture_output=True, text=True, timeout=5
+                )
+                for line in result.stdout.splitlines():
+                    if "inet " in line and "127.0.0.1" not in line:
+                        parts = line.split()
+                        for i, p in enumerate(parts):
+                            if p == "inet":
+                                ip_cidr = parts[i + 1]
+                                ip = ip_cidr.split("/")[0]
+                                try:
+                                    iface_ip = ipaddress.ip_address(ip)
+                                    if iface_ip.is_private:
+                                        net = ipaddress.ip_network(ip_cidr, strict=False)
+                                        subnets.append(str(net))
+                                except ValueError:
+                                    pass
+        except Exception:
+            pass
+        
+        if not subnets:
+            local_ip = self._get_local_ip()
+            if local_ip and local_ip != "127.0.0.1":
+                net = ipaddress.ip_network(f"{local_ip}/24", strict=False)
+                subnets.append(str(net))
+        
+        return subnets
+    
+    def _get_local_ip(self) -> str:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
+    
+    def _active_scan(self, subnet: str) -> List[Dict]:
+        devices = []
+        
+        try:
+            from scapy.all import ARP, Ether, srp
+            arp = ARP(pdst=subnet)
+            ether = Ether(dst="ff:ff:ff:ff:ff:ff")
+            result = srp(ether / arp, timeout=1, verbose=False)[0]
+            
+            for sent, received in result:
+                ip = received.psrc
+                mac = received.hwsrc.upper()
+                hostname = self._reverse_dns(ip)
+                devices.append({
+                    "ip_address": ip,
+                    "mac_address": mac,
+                    "hostname": hostname,
+                    "vendor": "",
+                    "device_type": ""
+                })
+        except ImportError:
+            devices = self._nmap_scan(subnet)
+        except Exception:
+            pass
+        
+        return devices
+    
+    def _nmap_scan(self, subnet: str) -> List[Dict]:
+        devices = []
+        try:
+            import nmap
+            nm = nmap.PortScanner()
+            nm.scan(hosts=subnet, arguments="-sn --host-timeout 10s")
+            
+            for host in nm.all_hosts():
+                if "mac" in nm[host].get("addresses", {}):
+                    mac = nm[host]["addresses"]["mac"].upper()
+                    hostname = nm[host].hostname() or self._reverse_dns(host)
+                    devices.append({
+                        "ip_address": host,
+                        "mac_address": mac,
+                        "hostname": hostname,
+                        "vendor": nm[host].get("vendor", {}).get("mac", ""),
+                        "device_type": ""
+                    })
+                else:
+                    hostname = nm[host].hostname() or self._reverse_dns(host)
+                    devices.append({
+                        "ip_address": host,
+                        "mac_address": "",
+                        "hostname": hostname,
+                        "vendor": "",
+                        "device_type": ""
+                    })
+        except ImportError:
+            pass
+        except Exception:
+            pass
+        
+        return devices
     
     def _arp_scan(self) -> List[Dict]:
         devices = []

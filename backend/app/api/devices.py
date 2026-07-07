@@ -27,10 +27,12 @@ network_resolver = UniversalNetworkResolver()
 probe_analyzer = ProbeRequestAnalyzer()
 passive_ssid = PassiveSsidDiscovery()
 
+DOCKER_IP_PREFIXES = ("172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")
+
 @router.get("/", response_model=List[dict])
 def get_devices(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 200,
     risk_level: Optional[str] = None,
     scan_source: Optional[str] = None,
     client_id: Optional[str] = None,
@@ -44,8 +46,12 @@ def get_devices(
     if client_id:
         query = query.filter(Device.client_id == client_id)
     devices = query.offset(skip).limit(limit).all()
-    return [
-        {
+    result = []
+    for d in devices:
+        ip = d.ip_address or ""
+        if ip.startswith(DOCKER_IP_PREFIXES):
+            continue
+        result.append({
             "id": d.id,
             "mac_address": d.mac_address,
             "mac_prefix": d.mac_prefix,
@@ -62,9 +68,8 @@ def get_devices(
             "scan_source": d.scan_source or 'server',
             "first_seen": d.first_seen.isoformat() if d.first_seen else None,
             "last_seen": d.last_seen.isoformat() if d.last_seen else None
-        }
-        for d in devices
-    ]
+        })
+    return result
 
 @router.get("/{device_id}")
 def get_device(device_id: int, db: Session = Depends(get_db)):
