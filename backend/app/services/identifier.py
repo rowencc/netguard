@@ -31,7 +31,7 @@ Confidence Scoring (weighted fusion):
 - OS fingerprint match:      weight=0.10
 """
 
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Tuple
 from app.services.vendor_lookup import VendorLookup
 from app.services.mac_analyzer import MACAnalyzer
 
