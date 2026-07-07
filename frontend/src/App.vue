@@ -39,6 +39,12 @@
         </router-link>
       </nav>
       <div class="sidebar-footer">
+        <button class="settings-btn" @click="showSettings = true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
         <div class="lang-switcher">
           <button class="lang-btn" :class="{ active: locale === 'zh-CN' }" @click="switchLang('zh-CN')">中文</button>
           <button class="lang-btn" :class="{ active: locale === 'en' }" @click="switchLang('en')">EN</button>
@@ -49,6 +55,9 @@
         </div>
       </div>
     </aside>
+
+    <!-- Settings Panel -->
+    <SettingsPanel :visible="showSettings" @close="showSettings = false" />
 
     <!-- Mobile Topbar -->
     <header v-if="isMobile" class="topbar">
@@ -126,18 +135,23 @@
 <script>
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
+import SettingsPanel from '@/components/SettingsPanel.vue'
+import { useTheme } from '@/composables/useTheme'
 
 export default {
   name: 'App',
+  components: { SettingsPanel },
   setup() {
     const { t, locale } = useI18n()
-    return { t, locale }
+    const theme = useTheme()
+    return { t, locale, ...theme }
   },
   data() {
     return {
       isMobile: false,
       alertCount: 0,
       showNotification: false,
+      showSettings: false,
       notificationTitle: '',
       notificationMessage: '',
       notificationSeverity: 'warning',
@@ -366,6 +380,33 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+}
+
+.settings-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-subtle);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.settings-btn:hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-hairline-strong);
+  color: var(--color-ink);
+}
+
+.settings-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .lang-switcher {
