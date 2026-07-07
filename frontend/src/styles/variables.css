@@ -4,7 +4,8 @@
 
 /* Dark Theme (Default) */
 :root,
-[data-theme="dark"] {
+[data-theme="dark"],
+.theme-dark {
   /* Primary Palette */
   --color-primary: #6366f1;
   --color-primary-hover: #818cf8;
@@ -56,7 +57,8 @@
 }
 
 /* Light Theme */
-[data-theme="light"] {
+[data-theme="light"],
+.theme-light {
   /* Primary Palette */
   --color-primary: #6366f1;
   --color-primary-hover: #4f46e5;
@@ -182,7 +184,12 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
   line-height: 1.5;
-  transition: background-color var(--transition-slow), color var(--transition-slow);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+html {
+  transition: background-color 0.3s ease;
 }
 
 /* ============================================

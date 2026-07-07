@@ -1,4 +1,4 @@
-import { reactive, computed, onMounted } from 'vue'
+import { reactive, computed } from 'vue'
 
 const STORAGE_KEY = 'netguard-theme'
 const CUSTOM_COLORS_KEY = 'netguard-custom-colors'
@@ -32,6 +32,7 @@ function getEffectiveTheme() {
 function applyTheme() {
   const theme = getEffectiveTheme()
   document.documentElement.setAttribute('data-theme', theme)
+  document.documentElement.className = `theme-${theme}`
 
   Object.entries(state.customColors).forEach(([key, value]) => {
     document.documentElement.style.setProperty(`--color-${key}`, value)
