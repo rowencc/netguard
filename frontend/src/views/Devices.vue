@@ -346,10 +346,12 @@ export default {
 
     this.removeWsHandler = this.onMessage(this.handleWsMessage)
 
-    // 监听客户端连接，清除错误状态
+    // 监听客户端连接，清除错误状态并加载设备
     this._unwatchClients = this.$watch('wsClients', (newVal, oldVal) => {
       if (newVal.length > 0 && oldVal.length === 0) {
         this.scanError = ''
+        // 客户端首次连接时，加载该客户端的设备
+        this.loadDevices()
       }
     })
   },
@@ -380,12 +382,18 @@ export default {
     },
     selectClient(clientId) {
       this.selectedClientId = this.selectedClientId === clientId ? '' : clientId
+      this.loadDevices()
     },
     async loadDevices() {
       this.loading = true
       this.isNewSession = false
       try {
         const params = { scan_source: 'client' }
+        // 如果有选中的客户端或只有1个客户端，按客户端过滤
+        const targetClientId = this.selectedClientId || (this.wsClients.length === 1 ? this.wsClients[0].client_id : '')
+        if (targetClientId) {
+          params.client_id = targetClientId
+        }
         if (this.filterRisk) {
           params.risk_level = this.filterRisk
         }
@@ -459,10 +467,11 @@ export default {
       this.scanning = true
       this.scanDevices = []
       this.scanError = ''
+      this.devices = [] // 清空当前设备列表，显示扫描进度
 
       // 优先使用客户端代理扫描（本地网络）
       const targetClientId = this.selectedClientId || (this.wsClients.length > 0 ? this.wsClients[0].client_id : '')
-      if (targetClientId && this.wsConnected) {
+      if (targetClientId) {
         try {
           const res = await api.post('/devices/scan-client', {
             client_id: targetClientId,
