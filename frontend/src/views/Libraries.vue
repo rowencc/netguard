@@ -23,7 +23,7 @@
       </div>
       <div class="stat-item">
         <span class="stat-label">{{ t('libraries.lastFullUpdate') }}</span>
-        <span class="stat-value">{{ lastFullUpdate || '-' }}</span>
+        <span class="stat-value">{{ formatDate(lastFullUpdate) }}</span>
       </div>
     </div>
 
@@ -188,7 +188,7 @@ export default {
       if (!isoString) return '-'
       const d = new Date(isoString)
       const pad = n => String(n).padStart(2, '0')
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
     }
   }
 }

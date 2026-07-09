@@ -191,8 +191,15 @@
       <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <p class="empty-text">{{ t('devices.noDevices') }}</p>
+      <p class="empty-text">{{ isNewSession ? t('devices.newSessionHint') : t('devices.noDevices') }}</p>
       <p class="empty-hint">{{ t('devices.noDevicesHint') }}</p>
+      <button v-if="isNewSession" class="btn btn-primary" @click="scanNetwork" :disabled="scanning" style="margin-top: 16px;">
+        <svg v-if="!scanning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;">
+          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <span v-if="scanning" class="spinner"></span>
+        {{ scanning ? t('devices.scanning') : t('devices.startScan') }}
+      </button>
     </div>
   </div>
 </template>
@@ -216,6 +223,7 @@ export default {
       scanning: false,
       loading: false,
       checking: false,
+      isNewSession: false,
       filterRisk: '',
       lookupMac: '',
       lookupResult: null,
@@ -237,7 +245,18 @@ export default {
     }
   },
   mounted() {
-    this.loadDevices()
+    const isRefresh = !!sessionStorage.getItem('netguard_devices_session')
+    sessionStorage.setItem('netguard_devices_session', '1')
+
+    if (isRefresh) {
+      // Refresh: clear current devices and auto-trigger scan
+      this.devices = []
+      this.scanNetwork()
+    } else {
+      // New session: don't load devices, show empty state
+      this.isNewSession = true
+    }
+
     this.removeWsHandler = this.onMessage(this.handleWsMessage)
   },
   beforeUnmount() {
@@ -267,6 +286,7 @@ export default {
     },
     async loadDevices() {
       this.loading = true
+      this.isNewSession = false
       try {
         const params = { scan_source: 'client' }
         if (this.filterRisk) {
@@ -627,19 +647,32 @@ export default {
 }
 
 .data-table td {
-  padding: 12px 16px;
-  font-size: 14px;
+  padding: 12px 12px;
+  font-size: 13px;
   color: var(--color-ink-muted);
   border-bottom: 1px solid var(--color-hairline);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-table th:nth-child(5),
+.data-table td:nth-child(5) {
+  min-width: 6em;
+}
+
+.data-table th:nth-child(7),
+.data-table td:nth-child(7) {
+  min-width: 5em;
 }
 
 .table-row:hover { background: var(--color-surface-2); }
 .table-row:last-child td { border-bottom: none; }
 
-.mono { font-family: var(--font-mono); font-size: 13px; }
-.cell-name { color: var(--color-ink); font-weight: 500; }
-.cell-vendor { color: var(--color-ink-subtle); }
-.cell-time { color: var(--color-ink-tertiary); font-size: 13px; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+.cell-name { color: var(--color-ink); font-weight: 500; max-width: 120px; }
+.cell-vendor { color: var(--color-ink-subtle); max-width: 150px; }
+.cell-time { color: var(--color-ink-tertiary); font-size: 12px; }
 
 .cell-actions {
   width: 60px;
@@ -755,9 +788,10 @@ export default {
   display: inline-flex;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .tag--primary {
@@ -789,10 +823,11 @@ export default {
   display: inline-flex;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
 .risk--low {
@@ -814,7 +849,8 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .status-indicator::before {

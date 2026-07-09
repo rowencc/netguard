@@ -71,6 +71,43 @@ def get_devices(
         })
     return result
 
+
+@router.get("/check-online")
+def check_devices_online(db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+
+    devices = db.query(Device).filter(
+        (Device.ip_address != None) & (Device.ip_address != "") &
+        (Device.scan_source == "client")
+    ).all()
+
+    if not devices:
+        return {"devices": [], "online_count": 0}
+
+    now = datetime.now()
+    threshold = timedelta(minutes=5)
+
+    results = []
+    online_count = 0
+    for d in devices:
+        if d.last_seen and (now - d.last_seen) < threshold:
+            is_online = True
+            online_count += 1
+        else:
+            is_online = False
+        results.append({
+            "id": d.id,
+            "ip_address": d.ip_address,
+            "is_online": is_online,
+        })
+
+    return {
+        "devices": results,
+        "online_count": online_count,
+        "total_count": len(devices),
+    }
+
+
 @router.get("/{device_id}")
 def get_device(device_id: int, db: Session = Depends(get_db)):
     device = db.query(Device).filter(Device.id == device_id).first()
@@ -554,64 +591,6 @@ def resolve_ssids_from_probe_file(db: Session = Depends(get_db)):
         "message": f"Updated {updated} devices with SSID from probe file",
         "updated_count": updated,
         "total_probed": len(mac_to_ssid),
-    }
-
-
-@router.get("/check-online")
-def check_devices_online(db: Session = Depends(get_db)):
-    import concurrent.futures
-    from app.services.platform_compat import ping_host
-
-    devices = db.query(Device).filter(
-        (Device.ip_address != None) & (Device.ip_address != "") &
-        (Device.scan_source == "client")
-    ).all()
-
-    if not devices:
-        return {"devices": [], "online_count": 0}
-
-    ip_list = [(d.id, d.ip_address) for d in devices]
-    online_ids = set()
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_id = {
-            executor.submit(ping_host, ip): dev_id
-            for dev_id, ip in ip_list
-        }
-        try:
-            for future in concurrent.futures.as_completed(future_to_id, timeout=15):
-                dev_id = future_to_id[future]
-                try:
-                    if future.result():
-                        online_ids.add(dev_id)
-                except Exception:
-                    pass
-        except TimeoutError:
-            for future, dev_id in future_to_id.items():
-                if future.done():
-                    try:
-                        if future.result():
-                            online_ids.add(dev_id)
-                    except Exception:
-                        pass
-
-    results = []
-    for d in devices:
-        is_online = d.id in online_ids
-        if is_online:
-            d.last_seen = func.now()
-        results.append({
-            "id": d.id,
-            "ip_address": d.ip_address,
-            "is_online": is_online,
-        })
-
-    db.commit()
-
-    return {
-        "devices": results,
-        "online_count": len(online_ids),
-        "total_count": len(devices),
     }
 
 

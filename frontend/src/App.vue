@@ -4,10 +4,8 @@
     <aside v-if="!isMobile" class="sidebar">
       <div class="sidebar-brand">
         <div class="brand-logo">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="2" width="28" height="28" rx="6" fill="#5e6ad2"/>
-            <path d="M16 6L8 10v6c0 5.52 3.42 10.68 8 12 4.58-1.32 8-6.48 8-12v-6l-8-4z" fill="none" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-            <path d="M12 15l3 3 5-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M593.408 64.341333l147.114667 84.906667a32 32 0 0 1-32 55.466667l-147.114667-84.992a96 96 0 0 0-96 0L241.493333 249.002667a127.402667 127.402667 0 0 1 13.226667 88.917333l103.765333 51.797333a191.744 191.744 0 0 1 155.050667-78.592c63.914667 0 120.490667 31.232 155.392 79.274667l103.68-51.285333a127.744 127.744 0 0 1-2.56-15.701334l-0.512-12.288a128 128 0 1 1 163.84 122.88l0.085333 219.221334c0 57.173333-30.464 109.994667-79.957333 138.496l-115.626667 66.816a32 32 0 0 1-32-55.466667l115.626667-66.730667c29.696-17.152 47.957333-48.810667 47.957333-83.114666V436.053333a127.914667 127.914667 0 0 1-67.584-39.850666l-104.448 51.712a192 192 0 0 1-130.56 239.701333v83.114667a128 128 0 1 1-178.005333 145.493333L173.482667 791.722667a160 160 0 0 1-80.042667-138.496V525.824a32 32 0 1 1 64 0v127.402667c0 34.304 18.346667 65.962667 48.042667 83.114666l187.221333 108.202667c14.08-39.936 47.36-70.826667 88.746667-81.408v-70.656A192 192 0 0 1 329.728 447.146667l-103.765333-51.968c-20.992 23.978667-50.688 40.106667-84.224 43.349333l-12.288 0.597333a128 128 0 1 1 66.218666-237.568L433.408 64.341333a160 160 0 0 1 160 0z" fill="var(--color-primary)"/>
           </svg>
         </div>
         <span class="brand-name">NetGuard</span>
@@ -39,19 +37,21 @@
         </router-link>
       </nav>
       <div class="sidebar-footer">
-        <button class="settings-btn" @click="showSettings = true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
-        <div class="lang-switcher">
-          <button class="lang-btn" :class="{ active: locale === 'zh-CN' }" @click="switchLang('zh-CN')">中文</button>
-          <button class="lang-btn" :class="{ active: locale === 'en' }" @click="switchLang('en')">EN</button>
-        </div>
         <div class="sidebar-status">
           <span class="status-dot"></span>
           <span class="status-text">{{ t('nav.systemOnline') }}</span>
+        </div>
+        <div class="sidebar-bottom-row">
+          <div class="lang-switcher">
+            <button class="lang-btn" :class="{ active: locale === 'zh-CN' }" @click="switchLang('zh-CN')">中文</button>
+            <button class="lang-btn" :class="{ active: locale === 'en' }" @click="switchLang('en')">EN</button>
+          </div>
+          <button class="settings-btn" @click="showSettings = true" title="设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
         </div>
       </div>
     </aside>
@@ -63,10 +63,8 @@
     <header v-if="isMobile" class="topbar">
       <div class="topbar-brand">
         <div class="brand-logo">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="2" width="28" height="28" rx="6" fill="#5e6ad2"/>
-            <path d="M16 6L8 10v6c0 5.52 3.42 10.68 8 12 4.58-1.32 8-6.48 8-12v-6l-8-4z" fill="none" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-            <path d="M12 15l3 3 5-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M593.408 64.341333l147.114667 84.906667a32 32 0 0 1-32 55.466667l-147.114667-84.992a96 96 0 0 0-96 0L241.493333 249.002667a127.402667 127.402667 0 0 1 13.226667 88.917333l103.765333 51.797333a191.744 191.744 0 0 1 155.050667-78.592c63.914667 0 120.490667 31.232 155.392 79.274667l103.68-51.285333a127.744 127.744 0 0 1-2.56-15.701334l-0.512-12.288a128 128 0 1 1 163.84 122.88l0.085333 219.221334c0 57.173333-30.464 109.994667-79.957333 138.496l-115.626667 66.816a32 32 0 0 1-32-55.466667l115.626667-66.730667c29.696-17.152 47.957333-48.810667 47.957333-83.114666V436.053333a127.914667 127.914667 0 0 1-67.584-39.850666l-104.448 51.712a192 192 0 0 1-130.56 239.701333v83.114667a128 128 0 1 1-178.005333 145.493333L173.482667 791.722667a160 160 0 0 1-80.042667-138.496V525.824a32 32 0 1 1 64 0v127.402667c0 34.304 18.346667 65.962667 48.042667 83.114666l187.221333 108.202667c14.08-39.936 47.36-70.826667 88.746667-81.408v-70.656A192 192 0 0 1 329.728 447.146667l-103.765333-51.968c-20.992 23.978667-50.688 40.106667-84.224 43.349333l-12.288 0.597333a128 128 0 1 1 66.218666-237.568L433.408 64.341333a160 160 0 0 1 160 0z" fill="var(--color-primary)"/>
           </svg>
         </div>
         <span class="brand-name">NetGuard</span>
@@ -77,9 +75,19 @@
           <span v-if="alertCount > 0" class="topbar-alert-badge">{{ alertCount > 99 ? '99+' : alertCount }}</span>
         </router-link>
       </div>
-      <div class="lang-switcher">
-        <button class="lang-btn" :class="{ active: locale === 'zh-CN' }" @click="switchLang('zh-CN')">中文</button>
-        <button class="lang-btn" :class="{ active: locale === 'en' }" @click="switchLang('en')">EN</button>
+      <div class="topbar-actions">
+        <button class="topbar-btn" @click="toggleThemeMode">
+          <svg v-if="effectiveTheme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+        <div class="lang-switcher">
+          <button class="lang-btn" :class="{ active: locale === 'zh-CN' }" @click="switchLang('zh-CN')">中</button>
+          <button class="lang-btn" :class="{ active: locale === 'en' }" @click="switchLang('en')">EN</button>
+        </div>
       </div>
     </header>
 
@@ -143,8 +151,8 @@ export default {
   components: { SettingsPanel },
   setup() {
     const { t, locale } = useI18n()
-    const theme = useTheme()
-    return { t, locale, ...theme }
+    const { mode, toggleTheme, effectiveTheme } = useTheme()
+    return { t, locale, themeMode: mode, toggleThemeMode: toggleTheme, effectiveTheme }
   },
   data() {
     return {
@@ -268,8 +276,8 @@ html, body {
 }
 
 .brand-logo {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
 }
 
@@ -281,8 +289,8 @@ html, body {
 .brand-name {
   font-family: var(--font-display);
   font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.5px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
   color: var(--color-ink);
 }
 
@@ -382,20 +390,25 @@ html, body {
   gap: var(--space-sm);
 }
 
+.sidebar-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .settings-btn {
-  width: 100%;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 8px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-ink-subtle);
-  font-size: 13px;
   cursor: pointer;
   transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .settings-btn:hover {
@@ -411,11 +424,16 @@ html, body {
 
 .lang-switcher {
   display: flex;
-  gap: var(--space-xxs);
+  gap: 2px;
+}
+
+.lang-switcher {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .lang-btn {
-  flex: 1;
   padding: 4px 8px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-sm);
@@ -425,6 +443,7 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .lang-btn:hover {
@@ -474,14 +493,48 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-md);
+  padding: 0 var(--space-sm);
   z-index: 100;
+  gap: var(--space-xs);
+  overflow: hidden;
 }
 
 .topbar-brand {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.topbar-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-subtle);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.topbar-btn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+
+.topbar-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .topbar-alert {
@@ -531,12 +584,14 @@ html, body {
 }
 
 .topbar .lang-switcher {
-  gap: var(--space-xxs);
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .topbar .lang-btn {
-  padding: 3px 6px;
+  padding: 4px 6px;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 /* Global Notification */

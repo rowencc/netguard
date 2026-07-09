@@ -41,6 +41,8 @@ export default {
     unknown: '未知',
     noDevices: '未发现设备',
     noDevicesHint: '点击"扫描网络"发现设备',
+    newSessionHint: '新会话已开启，当前未加载历史设备数据',
+    startScan: '开始检测',
     scanFailed: '扫描失败',
     loadFailed: '加载设备列表失败',
     lookupTitle: 'MAC 地址查询',

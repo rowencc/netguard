@@ -41,6 +41,8 @@ export default {
     unknown: 'Unknown',
     noDevices: 'No devices found',
     noDevicesHint: 'Click "Scan Network" to discover devices',
+    newSessionHint: 'New session started, historical device data not loaded',
+    startScan: 'Start Scan',
     scanFailed: 'Scan failed',
     loadFailed: 'Failed to load devices',
     lookupTitle: 'MAC Lookup',

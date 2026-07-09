@@ -153,6 +153,11 @@ deploy() {
     npm run build
     cd ..
     
+    # Copy frontend to web root
+    sudo rm -rf /home/wwwroot/net.soccn.com/*
+    sudo cp -r frontend/dist/* /home/wwwroot/net.soccn.com/
+    sudo chown -R www:www /home/wwwroot/net.soccn.com/
+    
     # Restart services
     restart
     

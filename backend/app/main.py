@@ -81,7 +81,6 @@ def sync_heartbeat(body: dict):
 
 from fastapi import Body
 
-@app.post("/api/sync/report-devices")
 def normalize_mac(mac: str) -> str:
     if not mac:
         return ""

@@ -59,6 +59,14 @@ def get_libraries_status():
     aruba_info = _get_file_info(BACKEND_DIR / "data" / "aruba_oui.json")
     device_type_info = _get_file_info(BACKEND_DIR / "data" / "mac_device_type.json")
 
+    history_timestamp = last_update.get("timestamp") if last_update else None
+    file_timestamp = multi_info.get("modified")
+
+    if history_timestamp and file_timestamp:
+        last_full_update = max(history_timestamp, file_timestamp)
+    else:
+        last_full_update = history_timestamp or file_timestamp
+
     return {
         "libraries": [
             {
@@ -68,7 +76,7 @@ def get_libraries_status():
                 "source": "https://standards-oui.ieee.org/",
                 "type": "oui",
                 "status": "active" if ieee_info["exists"] else "missing",
-                "entries": last_update.get("ieee", ieee_info["entries"]) if last_update else ieee_info["entries"],
+                "entries": ieee_info["entries"],
                 "lastUpdate": ieee_info["modified"],
                 "size": ieee_info["size"],
                 "autoUpdate": True,
@@ -80,7 +88,7 @@ def get_libraries_status():
                 "source": "https://github.com/nmap/nmap",
                 "type": "oui",
                 "status": "active" if nmap_info["exists"] else "missing",
-                "entries": last_update.get("nmap", nmap_info["entries"]) if last_update else nmap_info["entries"],
+                "entries": nmap_info["entries"],
                 "lastUpdate": nmap_info["modified"],
                 "size": nmap_info["size"],
                 "autoUpdate": True,
@@ -92,7 +100,7 @@ def get_libraries_status():
                 "source": "本地合并",
                 "type": "merged",
                 "status": "active" if multi_info["exists"] else "missing",
-                "entries": last_update.get("merged_total", multi_info["entries"]) if last_update else multi_info["entries"],
+                "entries": multi_info["entries"],
                 "lastUpdate": multi_info["modified"],
                 "size": multi_info["size"],
                 "autoUpdate": False,
@@ -146,8 +154,8 @@ def get_libraries_status():
                 "autoUpdate": False,
             },
         ],
-        "lastFullUpdate": last_update.get("timestamp") if last_update else None,
-        "totalEntries": last_update.get("merged_total", 0) if last_update else 0,
+        "lastFullUpdate": last_full_update,
+        "totalEntries": multi_info.get("entries", 0),
     }
 
 
