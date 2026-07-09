@@ -49,8 +49,10 @@ export function useWebSocket() {
         } else if (data.type === 'client_info_update') {
           const client = clients.value.find(c => c.client_id === data.client_id)
           if (client) {
-            client.device_count = data.device_count
-            client.online_count = data.online_count
+            if (data.device_count !== undefined) client.device_count = data.device_count
+            if (data.online_count !== undefined) client.online_count = data.online_count
+            if (data.version !== undefined) client.version = data.version
+            if (data.is_online !== undefined) client.is_online = data.is_online
           }
         } else if (data.type === 'scan_progress') {
           scanProgress.value = data

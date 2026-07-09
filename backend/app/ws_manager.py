@@ -35,7 +35,7 @@ class ConnectionManager:
         await websocket.send_json({
             "type": "client_list",
             "clients": [
-                {"client_id": cid, **info}
+                {"client_id": cid, "is_online": True, **info}
                 for cid, info in self._client_info.items()
             ]
         })

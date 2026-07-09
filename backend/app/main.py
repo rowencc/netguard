@@ -237,12 +237,26 @@ async def ws_client(websocket: WebSocket, client_id: str):
     db = SessionLocal()
     try:
         client = db.query(Client).filter(Client.client_id == client_id).first()
+        if not client:
+            client = Client(
+                client_id=client_id,
+                hostname=client_id.split('-')[1] if '-' in client_id else client_id,
+                is_online=True
+            )
+            db.add(client)
+            db.commit()
+        else:
+            client.is_online = True
+            client.last_heartbeat = func.now()
+            db.commit()
         info = {
-            "hostname": client.hostname if client else "",
-            "ip_address": client.ip_address if client else "",
-            "platform": client.platform if client else "",
-            "device_count": client.device_count if client else 0,
-            "online_count": client.online_count if client else 0,
+            "hostname": client.hostname or "",
+            "ip_address": client.ip_address or "",
+            "platform": client.platform or "",
+            "version": client.version or "0.0.0",
+            "device_count": client.device_count or 0,
+            "online_count": client.online_count or 0,
+            "is_online": True,
         }
     finally:
         db.close()
@@ -261,6 +275,8 @@ async def ws_client(websocket: WebSocket, client_id: str):
                         client.last_heartbeat = func.now()
                         client.device_count = data.get("device_count", 0)
                         client.online_count = data.get("online_count", 0)
+                        client.version = data.get("version", client.version)
+                        client.is_online = True
                         db.commit()
                 finally:
                     db.close()
@@ -271,6 +287,8 @@ async def ws_client(websocket: WebSocket, client_id: str):
                     "client_id": client_id,
                     "device_count": data.get("device_count", 0),
                     "online_count": data.get("online_count", 0),
+                    "version": data.get("version", ""),
+                    "is_online": True,
                 })
 
             elif msg_type == "scan_result":
@@ -341,7 +359,22 @@ async def ws_client(websocket: WebSocket, client_id: str):
     except WebSocketDisconnect:
         pass
     finally:
+        # 设置客户端离线状态
+        db = SessionLocal()
+        try:
+            client = db.query(Client).filter(Client.client_id == client_id).first()
+            if client:
+                client.is_online = False
+                db.commit()
+        finally:
+            db.close()
         await manager.disconnect_client(client_id)
+        # 通知前端客户端离线
+        await manager.broadcast_to_frontends({
+            "type": "client_info_update",
+            "client_id": client_id,
+            "is_online": False,
+        })
 
 @app.websocket("/ws/frontend")
 async def ws_frontend(websocket: WebSocket):

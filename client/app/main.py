@@ -131,7 +131,8 @@ class NetGuardClient:
                     asyncio.run_coroutine_threadsafe(
                         self.ws_client.send_heartbeat(
                             device_count=len(self._last_scan_devices),
-                            online_count=online_count
+                            online_count=online_count,
+                            version="0.4.0"
                         ),
                         self._ws_loop
                     ) if self._ws_loop else None
@@ -146,7 +147,7 @@ class NetGuardClient:
                 hostname=socket.gethostname(),
                 ip_address=self._get_local_ip(),
                 platform=sys.platform,
-                version="0.3.0",
+                version="0.4.0",
                 device_count=len(self._last_scan_devices),
                 online_count=online_count
             )

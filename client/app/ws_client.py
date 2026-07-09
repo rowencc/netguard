@@ -67,11 +67,12 @@ class WSClient:
                 print(f"[WS] Send error: {e}")
                 self.connected = False
     
-    async def send_heartbeat(self, device_count: int = 0, online_count: int = 0):
+    async def send_heartbeat(self, device_count: int = 0, online_count: int = 0, version: str = "0.4.0"):
         await self.send_json({
             "type": "heartbeat",
             "device_count": device_count,
             "online_count": online_count,
+            "version": version,
         })
     
     async def send_scan_result(self, scan_id: str, device: dict):
