@@ -191,15 +191,37 @@
       <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <p class="empty-text">{{ isNewSession ? t('devices.newSessionHint') : t('devices.noDevices') }}</p>
-      <p class="empty-hint">{{ t('devices.noDevicesHint') }}</p>
-      <button v-if="isNewSession" class="btn btn-primary" @click="scanNetwork" :disabled="scanning" style="margin-top: 16px;">
-        <svg v-if="!scanning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;">
-          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <span v-if="scanning" class="spinner"></span>
-        {{ scanning ? t('devices.scanning') : t('devices.startScan') }}
-      </button>
+
+      <!-- 无客户端代理连接 -->
+      <template v-if="scanError === 'no_client' || (!isNewSession && !hasClient)">
+        <p class="empty-text">{{ t('devices.noClientTitle') }}</p>
+        <p class="empty-hint">{{ t('devices.noClientHint') }}</p>
+      </template>
+
+      <!-- 新会话，有客户端可用 -->
+      <template v-else-if="isNewSession && hasClient">
+        <p class="empty-text">{{ t('devices.newSessionHint') }}</p>
+        <p class="empty-hint">{{ t('devices.newSessionSubHint') }}</p>
+        <button class="btn btn-primary" @click="scanNetwork" :disabled="scanning" style="margin-top: 16px;">
+          <svg v-if="!scanning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;">
+            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span v-if="scanning" class="spinner"></span>
+          {{ scanning ? t('devices.scanning') : t('devices.startScan') }}
+        </button>
+      </template>
+
+      <!-- 新会话，无客户端 -->
+      <template v-else-if="isNewSession && !hasClient">
+        <p class="empty-text">{{ t('devices.noClientTitle') }}</p>
+        <p class="empty-hint">{{ t('devices.noClientHint') }}</p>
+      </template>
+
+      <!-- 默认 -->
+      <template v-else>
+        <p class="empty-text">{{ t('devices.noDevices') }}</p>
+        <p class="empty-hint">{{ t('devices.noDevicesHint') }}</p>
+      </template>
     </div>
   </div>
 </template>
@@ -224,6 +246,7 @@ export default {
       loading: false,
       checking: false,
       isNewSession: false,
+      scanError: '',
       filterRisk: '',
       lookupMac: '',
       lookupResult: null,
@@ -242,6 +265,9 @@ export default {
         return this.scanDevices
       }
       return this.devices
+    },
+    hasClient() {
+      return this.wsClients.length > 0
     }
   },
   mounted() {
@@ -258,10 +284,20 @@ export default {
     }
 
     this.removeWsHandler = this.onMessage(this.handleWsMessage)
+
+    // 监听客户端连接，清除错误状态
+    this._unwatchClients = this.$watch('wsClients', (newVal, oldVal) => {
+      if (newVal.length > 0 && oldVal.length === 0) {
+        this.scanError = ''
+      }
+    })
   },
   beforeUnmount() {
     if (this.removeWsHandler) {
       this.removeWsHandler()
+    }
+    if (this._unwatchClients) {
+      this._unwatchClients()
     }
   },
   methods: {
@@ -361,21 +397,25 @@ export default {
     async scanNetwork() {
       this.scanning = true
       this.scanDevices = []
+      this.scanError = ''
 
-      if (this.selectedClientId && this.wsConnected) {
+      // 优先使用客户端代理扫描（本地网络）
+      const targetClientId = this.selectedClientId || (this.wsClients.length > 0 ? this.wsClients[0].client_id : '')
+      if (targetClientId && this.wsConnected) {
         try {
           const res = await api.post('/devices/scan-client', {
-            client_id: this.selectedClientId,
+            client_id: targetClientId,
           })
           this.scanId = res.data.scan_id
+          return
         } catch (e) {
           console.error('Client scan failed:', e)
-          this.scanning = false
-          await this.scanServerSide()
         }
-      } else {
-        await this.scanServerSide()
       }
+
+      // 没有客户端代理连接时，提示用户
+      this.scanning = false
+      this.scanError = 'no_client'
     },
     async scanServerSide() {
       try {
