@@ -241,6 +241,8 @@ async def ws_client(websocket: WebSocket, client_id: str):
             "hostname": client.hostname if client else "",
             "ip_address": client.ip_address if client else "",
             "platform": client.platform if client else "",
+            "device_count": client.device_count if client else 0,
+            "online_count": client.online_count if client else 0,
         }
     finally:
         db.close()
@@ -263,6 +265,13 @@ async def ws_client(websocket: WebSocket, client_id: str):
                 finally:
                     db.close()
                 await websocket.send_json({"type": "heartbeat_ack"})
+                # 广播更新后的客户端信息到前端
+                await manager.broadcast_to_frontends({
+                    "type": "client_info_update",
+                    "client_id": client_id,
+                    "device_count": data.get("device_count", 0),
+                    "online_count": data.get("online_count", 0),
+                })
 
             elif msg_type == "scan_result":
                 scan_id = data.get("scan_id")

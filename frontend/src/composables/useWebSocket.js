@@ -46,6 +46,12 @@ export function useWebSocket() {
           }
         } else if (data.type === 'client_disconnected') {
           clients.value = clients.value.filter(c => c.client_id !== data.client_id)
+        } else if (data.type === 'client_info_update') {
+          const client = clients.value.find(c => c.client_id === data.client_id)
+          if (client) {
+            client.device_count = data.device_count
+            client.online_count = data.online_count
+          }
         } else if (data.type === 'scan_progress') {
           scanProgress.value = data
         }
