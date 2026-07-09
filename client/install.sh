@@ -57,11 +57,11 @@ detect_os() {
 # ============================================
 check_python() {
     if command -v python3 &>/dev/null; then
-        PYTHON_VER=$(python3 --version 2>&1 | grep -oP '\d+\.\d+')
+        PYTHON_VER=$(python3 --version 2>&1 | sed -E 's/[^0-9]*([0-9]+\.[0-9]+).*/\1/')
         log "Python3 已安装: $(python3 --version)"
         PYTHON_CMD="python3"
     elif command -v python &>/dev/null; then
-        PYTHON_VER=$(python --version 2>&1 | grep -oP '\d+\.\d+')
+        PYTHON_VER=$(python --version 2>&1 | sed -E 's/[^0-9]*([0-9]+\.[0-9]+).*/\1/')
         log "Python 已安装: $(python --version)"
         PYTHON_CMD="python"
     else
