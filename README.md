@@ -4,6 +4,32 @@
 
 NetGuard 是一个局域网设备扫描与安全监控系统，用于发现、识别和追踪网络中的设备，特别针对摄像头等高风险设备进行监控。
 
+## 快速开始
+
+### 一键安装客户端代理
+
+在您的**内网设备**（Mac 或 Linux）上运行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rowencc/netguard/main/client/install.sh | bash
+```
+
+安装完成后，打开 https://net.soccn.com/ 即可查看设备。
+
+### 客户端管理命令
+
+```bash
+~/.netguard/start.sh     # 启动
+~/.netguard/stop.sh      # 停止
+~/.netguard/status.sh    # 查看状态
+```
+
+### 卸载客户端
+
+```bash
+~/.netguard/uninstall.sh
+```
+
 ## 系统架构
 
 ```
