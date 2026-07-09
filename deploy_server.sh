@@ -226,7 +226,16 @@ setup_frontend() {
     fi
 
     npm run build
-    log "前端构建完成"
+
+    # 同步到 Nginx 服务目录
+    NGINX_ROOT="/home/wwwroot/net.soccn.com"
+    if [ -d "$NGINX_ROOT" ]; then
+        rm -rf "$NGINX_ROOT/assets" "$NGINX_ROOT/index.html" "$NGINX_ROOT/favicon.svg"
+        cp -r "$DEPLOY_PATH/frontend/dist/"* "$NGINX_ROOT/"
+        log "前端构建完成，已同步到 $NGINX_ROOT"
+    else
+        log "前端构建完成（未找到 Nginx 目录 $NGINX_ROOT）"
+    fi
 }
 
 # ============================================
