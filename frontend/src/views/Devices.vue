@@ -192,10 +192,76 @@
         <path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
 
-      <!-- 无客户端代理连接 -->
-      <template v-if="scanError === 'no_client' || (!isNewSession && !hasClient)">
+      <!-- 无客户端代理连接 - 显示安装指南 -->
+      <template v-if="scanError === 'no_client' || (!hasClient)">
         <p class="empty-text">{{ t('devices.noClientTitle') }}</p>
-        <p class="empty-hint">{{ t('devices.noClientHint') }}</p>
+        <p class="empty-hint" style="margin-bottom: 20px;">{{ t('devices.noClientHint') }}</p>
+
+        <div class="install-guide">
+          <h3 class="guide-title">{{ t('devices.quickInstall') }}</h3>
+
+          <!-- 一键安装命令 -->
+          <div class="install-step">
+            <div class="step-header">
+              <span class="step-num">1</span>
+              <span class="step-title">{{ t('devices.step1Title') }}</span>
+            </div>
+            <p class="step-desc">{{ t('devices.step1Desc') }}</p>
+            <div class="code-block">
+              <code>curl -fsSL https://raw.githubusercontent.com/rowencc/netguard/main/client/install.sh | bash</code>
+              <button class="btn-copy" @click="copyInstallCmd" :title="t('devices.copy')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 安装说明 -->
+          <div class="install-step">
+            <div class="step-header">
+              <span class="step-num">2</span>
+              <span class="step-title">{{ t('devices.step2Title') }}</span>
+            </div>
+            <p class="step-desc">{{ t('devices.step2Desc') }}</p>
+            <div class="code-block">
+              <code>~/.netguard/start.sh</code>
+            </div>
+          </div>
+
+          <!-- 管理命令 -->
+          <div class="install-step">
+            <div class="step-header">
+              <span class="step-num">3</span>
+              <span class="step-title">{{ t('devices.step3Title') }}</span>
+            </div>
+            <div class="cmd-list">
+              <div class="cmd-item">
+                <code>~/.netguard/start.sh</code>
+                <span class="cmd-desc">{{ t('devices.cmdStart') }}</span>
+              </div>
+              <div class="cmd-item">
+                <code>~/.netguard/stop.sh</code>
+                <span class="cmd-desc">{{ t('devices.cmdStop') }}</span>
+              </div>
+              <div class="cmd-item">
+                <code>~/.netguard/status.sh</code>
+                <span class="cmd-desc">{{ t('devices.cmdStatus') }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 支持系统 -->
+          <div class="support-info">
+            <span class="support-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+              {{ t('devices.supportedOS') }}
+            </span>
+          </div>
+        </div>
       </template>
 
       <!-- 新会话，有客户端可用 -->
@@ -209,12 +275,6 @@
           <span v-if="scanning" class="spinner"></span>
           {{ scanning ? t('devices.scanning') : t('devices.startScan') }}
         </button>
-      </template>
-
-      <!-- 新会话，无客户端 -->
-      <template v-else-if="isNewSession && !hasClient">
-        <p class="empty-text">{{ t('devices.noClientTitle') }}</p>
-        <p class="empty-hint">{{ t('devices.noClientHint') }}</p>
       </template>
 
       <!-- 默认 -->
@@ -247,6 +307,7 @@ export default {
       checking: false,
       isNewSession: false,
       scanError: '',
+      copied: false,
       filterRisk: '',
       lookupMac: '',
       lookupResult: null,
@@ -475,6 +536,13 @@ export default {
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit'
+      })
+    },
+    copyInstallCmd() {
+      const cmd = 'curl -fsSL https://raw.githubusercontent.com/rowencc/netguard/main/client/install.sh | bash'
+      navigator.clipboard.writeText(cmd).then(() => {
+        this.copied = true
+        setTimeout(() => { this.copied = false }, 2000)
       })
     }
   }
@@ -969,6 +1037,163 @@ export default {
 
 .empty-text { font-size: 16px; font-weight: 500; color: var(--color-ink-muted); margin-bottom: var(--space-xs); }
 .empty-hint { font-size: 14px; color: var(--color-ink-subtle); }
+
+/* Installation Guide */
+.install-guide {
+  text-align: left;
+  max-width: 480px;
+  width: 100%;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.guide-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-bottom: var(--space-md);
+  text-align: center;
+}
+
+.install-step {
+  margin-bottom: var(--space-md);
+}
+
+.install-step:last-child {
+  margin-bottom: 0;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.step-num {
+  width: 24px;
+  height: 24px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.step-desc {
+  font-size: 13px;
+  color: var(--color-ink-subtle);
+  margin-bottom: var(--space-sm);
+  padding-left: 32px;
+}
+
+.code-block {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-left: 32px;
+}
+
+.code-block code {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink);
+  word-break: break-all;
+  user-select: all;
+}
+
+.btn-copy {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-ink-subtle);
+  transition: all var(--transition-fast);
+}
+
+.btn-copy:hover {
+  background: var(--color-surface-3);
+  color: var(--color-primary);
+}
+
+.cmd-list {
+  margin-left: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cmd-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 13px;
+}
+
+.cmd-item code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--color-surface-2);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+}
+
+.cmd-desc {
+  color: var(--color-ink-subtle);
+}
+
+.support-info {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.support-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 12px;
+  color: var(--color-ink-subtle);
+  background: var(--color-surface-2);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+}
+
+@media (max-width: 768px) {
+  .install-guide {
+    max-width: 100%;
+  }
+
+  .code-block {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn-copy {
+    align-self: flex-end;
+  }
+}
 
 .desktop-only { display: block; }
 .mobile-only { display: none; }
