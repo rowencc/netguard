@@ -208,7 +208,7 @@
             </div>
             <p class="step-desc">{{ t('devices.step1Desc') }}</p>
             <div class="code-block">
-              <code>curl -fsSL https://raw.githubusercontent.com/rowencc/netguard/main/client/install.sh | bash</code>
+              <code>curl -fsSL https://net.soccn.com/install.sh | bash</code>
               <button class="btn-copy" @click="copyInstallCmd" :title="t('devices.copy')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>

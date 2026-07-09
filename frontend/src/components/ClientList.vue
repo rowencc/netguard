@@ -52,7 +52,7 @@
             <span>{{ t('clients.upgradeStep1') }}</span>
           </div>
           <div class="code-block">
-            <code>curl -fsSL https://raw.githubusercontent.com/rowencc/netguard/main/client/upgrade.sh | bash</code>
+            <code>curl -fsSL https://net.soccn.com/upgrade.sh | bash</code>
             <button class="btn-copy" @click="copyUpgradeCmd">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -112,7 +112,7 @@ export default {
       this.upgradeClient = client
     },
     copyUpgradeCmd() {
-      const cmd = 'curl -fsSL https://raw.githubusercontent.com/rowencc/netguard/main/client/upgrade.sh | bash'
+      const cmd = 'curl -fsSL https://net.soccn.com/upgrade.sh | bash'
       navigator.clipboard.writeText(cmd)
     }
   }
