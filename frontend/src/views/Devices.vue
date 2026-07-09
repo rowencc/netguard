@@ -51,7 +51,7 @@
     <header class="page-header">
       <div class="header-left">
         <h1 class="page-title">{{ t('devices.title') }}</h1>
-        <span class="page-subtitle">{{ t('devices.subtitle', { count: devices.length }) }}</span>
+        <span class="page-subtitle">{{ t('devices.subtitle', { count: displayDevices.length }) }}</span>
       </div>
       <div class="header-actions">
         <button class="btn btn-secondary" @click="loadDevices" :disabled="loading || checking">
@@ -192,43 +192,83 @@
         <path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
 
-      <!-- 无客户端代理连接 - 显示安装指南 -->
-      <template v-if="scanError === 'no_client' || (!hasClient)">
-        <p class="empty-text">{{ t('devices.noClientTitle') }}</p>
-        <p class="empty-hint" style="margin-bottom: 20px;">{{ t('devices.noClientHint') }}</p>
+      <!-- 扫描中 -->
+      <template v-if="scanning">
+        <p class="empty-text">{{ scanMode === 'browser' ? t('devices.browserScanning') : t('devices.scanning') }}</p>
+        <p class="empty-hint" v-if="scanProgress && scanProgress.status === 'scanning'">
+          {{ t('devices.scanProgress', { current: scanProgress.current || 0, total: scanProgress.total || 254 }) }}
+        </p>
+        <p class="empty-hint" v-else-if="scanProgress && scanProgress.status === 'detecting_ip'">
+          {{ t('devices.detectingIP') }}
+        </p>
+        <p class="empty-hint" v-else>{{ t('devices.scanningHint') }}</p>
+        <div class="spinner-large"></div>
+      </template>
 
-        <div class="install-guide">
-          <h3 class="guide-title">{{ t('devices.quickInstall') }}</h3>
+      <!-- 无客户端代理连接 - 显示两种扫描方式 -->
+      <template v-else-if="!hasClient">
+        <p class="empty-text">{{ t('devices.chooseScanMode') }}</p>
+        <p class="empty-hint" style="margin-bottom: 20px;">{{ t('devices.chooseScanModeHint') }}</p>
 
-          <!-- 一键安装命令 -->
-          <div class="install-step">
-            <div class="step-header">
-              <span class="step-num">1</span>
-              <span class="step-title">{{ t('devices.step1Title') }}</span>
+        <div class="scan-options">
+          <!-- 浏览器扫描选项 -->
+          <div class="scan-option" @click="scanNetwork">
+            <div class="option-icon browser-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;">
+                <path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
             </div>
-            <p class="step-desc">{{ t('devices.step1Desc') }}</p>
-            <div class="code-block">
-              <code>curl -fsSL https://net.soccn.com/install.sh | bash</code>
-              <button class="btn-copy" @click="copyInstallCmd" :title="t('devices.copy')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
-                </svg>
-              </button>
+            <div class="option-info">
+              <h4>{{ t('devices.browserScan') }}</h4>
+              <p>{{ t('devices.browserScanDesc') }}</p>
             </div>
           </div>
 
-          <!-- 安装说明 -->
-          <div class="install-step">
-            <div class="step-header">
-              <span class="step-num">2</span>
-              <span class="step-title">{{ t('devices.step2Title') }}</span>
+          <!-- 客户端代理选项 -->
+          <div class="scan-option">
+            <div class="option-icon client-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;">
+                <path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
             </div>
-            <p class="step-desc">{{ t('devices.step2Desc') }}</p>
-            <div class="code-block">
-              <code>~/.netguard/start.sh</code>
+            <div class="option-info">
+              <h4>{{ t('devices.clientScan') }}</h4>
+              <p>{{ t('devices.clientScanDesc') }}</p>
             </div>
           </div>
+        </div>
+
+        <!-- 安装客户端指南（折叠） -->
+        <details class="install-details">
+          <summary>{{ t('devices.howToInstallClient') }}</summary>
+          <div class="install-guide">
+            <div class="install-step">
+              <div class="step-header">
+                <span class="step-num">1</span>
+                <span class="step-title">{{ t('devices.step1Title') }}</span>
+              </div>
+              <p class="step-desc">{{ t('devices.step1Desc') }}</p>
+              <div class="code-block">
+                <code>curl -fsSL https://net.soccn.com/install.sh | bash</code>
+                <button class="btn-copy" @click="copyInstallCmd" :title="t('devices.copy')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="install-step">
+              <div class="step-header">
+                <span class="step-num">2</span>
+                <span class="step-title">{{ t('devices.step2Title') }}</span>
+              </div>
+              <p class="step-desc">{{ t('devices.step2Desc') }}</p>
+              <div class="code-block">
+                <code>~/.netguard/start.sh</code>
+              </div>
+            </div>
 
           <!-- 管理命令 -->
           <div class="install-step">
@@ -262,25 +302,22 @@
             </span>
           </div>
         </div>
+        </details>
       </template>
 
-      <!-- 新会话，有客户端可用 -->
-      <template v-else-if="isNewSession && hasClient">
-        <p class="empty-text">{{ t('devices.newSessionHint') }}</p>
-        <p class="empty-hint">{{ t('devices.newSessionSubHint') }}</p>
-        <button class="btn btn-primary" @click="scanNetwork" :disabled="scanning" style="margin-top: 16px;">
-          <svg v-if="!scanning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;">
-            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span v-if="scanning" class="spinner"></span>
-          {{ scanning ? t('devices.scanning') : t('devices.startScan') }}
+      <!-- 扫描失败 -->
+      <template v-else-if="scanError">
+        <p class="empty-text">{{ scanError === 'browser_scan_failed' ? t('devices.browserScanFailed') : t('devices.scanFailed') }}</p>
+        <p class="empty-hint">{{ scanError === 'browser_scan_failed' ? t('devices.browserScanFailedHint') : t('devices.scanFailedHint') }}</p>
+        <button class="btn btn-primary" @click="scanNetwork" style="margin-top: 16px;">
+          {{ t('devices.retry') }}
         </button>
       </template>
 
-      <!-- 默认 -->
+      <!-- 有客户端，等待扫描 -->
       <template v-else>
         <p class="empty-text">{{ t('devices.noDevices') }}</p>
-        <p class="empty-hint">{{ t('devices.noDevicesHint') }}</p>
+        <p class="empty-hint">{{ t('devices.clickScanToStart') }}</p>
       </template>
     </div>
   </div>
@@ -307,6 +344,8 @@ export default {
       checking: false,
       isNewSession: false,
       scanError: '',
+      scanMode: '',
+      scanProgress: null,
       copied: false,
       filterRisk: '',
       lookupMac: '',
@@ -398,7 +437,12 @@ export default {
           params.risk_level = this.filterRisk
         }
         const res = await api.get('/devices/', { params })
-        this.devices = res.data
+        // 只显示最近5分钟内发现的设备（当前活跃扫描的设备）
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000)
+        this.devices = res.data.filter(d => {
+          if (!d.last_seen) return false
+          return new Date(d.last_seen) > fiveMinAgo
+        })
         this.checkOnline()
       } catch (e) {
         console.error('Failed to load devices:', e)
@@ -467,11 +511,13 @@ export default {
       this.scanning = true
       this.scanDevices = []
       this.scanError = ''
-      this.devices = [] // 清空当前设备列表，显示扫描进度
+      this.devices = []
+      this.scanMode = ''
 
       // 优先使用客户端代理扫描（本地网络）
       const targetClientId = this.selectedClientId || (this.wsClients.length > 0 ? this.wsClients[0].client_id : '')
       if (targetClientId) {
+        this.scanMode = 'client'
         try {
           const res = await api.post('/devices/scan-client', {
             client_id: targetClientId,
@@ -483,9 +529,45 @@ export default {
         }
       }
 
-      // 没有客户端代理连接时，提示用户
-      this.scanning = false
-      this.scanError = 'no_client'
+      // 没有客户端代理时，使用浏览器本地扫描
+      this.scanMode = 'browser'
+      await this.scanWithBrowser()
+    },
+    async scanWithBrowser() {
+      const { BrowserScanner } = await import('@/utils/browser-scanner.js')
+      const scanner = new BrowserScanner()
+
+      await scanner.scan(
+        (device) => {
+          // 发现设备，添加到列表
+          if (!this.scanDevices.find(d => d.ip_address === device.ip_address)) {
+            this.scanDevices.push(device)
+          }
+        },
+        (progress) => {
+          this.scanProgress = progress
+          if (progress.status === 'complete') {
+            this.scanning = false
+            // 浏览器扫描完成后，将结果上报到服务器
+            this.reportBrowserScan()
+          } else if (progress.status === 'error') {
+            this.scanning = false
+            this.scanError = 'browser_scan_failed'
+          }
+        }
+      )
+    },
+    async reportBrowserScan() {
+      if (this.scanDevices.length === 0) return
+      try {
+        await api.post('/devices/scan-browser', {
+          client_ip: this.scanDevices[0]?.ip_address || '',
+          devices: this.scanDevices
+        })
+        this.loadDevices()
+      } catch (e) {
+        console.error('Report browser scan failed:', e)
+      }
     },
     async scanServerSide() {
       try {
@@ -1189,6 +1271,89 @@ export default {
   border-radius: var(--radius-pill);
 }
 
+/* Scan Options */
+.scan-options {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  max-width: 500px;
+  width: 100%;
+}
+
+.scan-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-lg);
+  background: var(--color-surface-1);
+  border: 2px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.scan-option:hover {
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.05);
+  transform: translateY(-2px);
+}
+
+.option-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-sm);
+}
+
+.browser-icon {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.client-icon {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.option-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin: 0 0 4px 0;
+}
+
+.option-info p {
+  font-size: 12px;
+  color: var(--color-ink-subtle);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.install-details {
+  max-width: 500px;
+  width: 100%;
+}
+
+.install-details summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-primary);
+  padding: var(--space-sm) 0;
+}
+
+.install-details summary:hover {
+  text-decoration: underline;
+}
+
+.install-details .install-guide {
+  margin-top: var(--space-sm);
+}
+
 @media (max-width: 768px) {
   .install-guide {
     max-width: 100%;
@@ -1202,6 +1367,30 @@ export default {
   .btn-copy {
     align-self: flex-end;
   }
+
+  .scan-options {
+    flex-direction: column;
+  }
+
+  .scan-option {
+    flex-direction: row;
+    text-align: left;
+    gap: var(--space-md);
+  }
+
+  .option-icon {
+    margin-bottom: 0;
+  }
+}
+
+.spinner-large {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-hairline);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-top: var(--space-md);
 }
 
 .desktop-only { display: block; }
