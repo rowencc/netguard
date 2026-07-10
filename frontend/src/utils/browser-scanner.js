@@ -111,12 +111,16 @@ export class BrowserScanner {
       onProgress({ status: 'detecting_ip', message: '正在检测本地IP地址...' })
       this.localIP = await this.getLocalIP()
 
+      console.log('[BrowserScanner] Detected local IP:', this.localIP)
+
       if (!this.localIP) {
         throw new Error('无法获取本地IP地址。请确保浏览器有WebRTC权限。')
       }
 
       this.subnet = this.getSubnet(this.localIP)
       const subnetCidr = `${this.subnet}.0/24`
+
+      console.log('[BrowserScanner] Subnet:', this.subnet, 'CIDR:', subnetCidr)
 
       onProgress({
         status: 'scanning',
@@ -127,11 +131,13 @@ export class BrowserScanner {
       })
 
       // 启动后端扫描（异步）
+      console.log('[BrowserScanner] Calling /devices/scan-subnet...')
       const response = await api.post('/devices/scan-subnet', {
         subnet: subnetCidr,
         client_ip: this.localIP
       })
 
+      console.log('[BrowserScanner] Scan started:', response.data)
       const { scan_id } = response.data
 
       onProgress({
@@ -143,6 +149,8 @@ export class BrowserScanner {
       // 轮询扫描状态
       const result = await this.pollScanStatus(scan_id, onProgress)
 
+      console.log('[BrowserScanner] Scan result:', result)
+
       onProgress({
         status: 'scanning',
         message: `扫描完成，正在加载设备列表...`,
@@ -152,6 +160,8 @@ export class BrowserScanner {
       // 从数据库获取最新的设备列表
       const devicesResponse = await api.get('/devices/')
       const allDevices = devicesResponse.data
+
+      console.log('[BrowserScanner] Total devices in DB:', allDevices.length)
 
       const subnetPrefix = this.subnet
       const scannedDevices = allDevices.filter(d =>

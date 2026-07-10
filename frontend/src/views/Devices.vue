@@ -427,7 +427,7 @@ export default {
       this.loading = true
       this.isNewSession = false
       try {
-        const params = { scan_source: 'client' }
+        const params = {}
         // 如果有选中的客户端或只有1个客户端，按客户端过滤
         const targetClientId = this.selectedClientId || (this.wsClients.length === 1 ? this.wsClients[0].client_id : '')
         if (targetClientId) {
@@ -437,12 +437,7 @@ export default {
           params.risk_level = this.filterRisk
         }
         const res = await api.get('/devices/', { params })
-        // 只显示最近5分钟内发现的设备（当前活跃扫描的设备）
-        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000)
-        this.devices = res.data.filter(d => {
-          if (!d.last_seen) return false
-          return new Date(d.last_seen) > fiveMinAgo
-        })
+        this.devices = res.data
         this.checkOnline()
       } catch (e) {
         console.error('Failed to load devices:', e)
@@ -508,6 +503,7 @@ export default {
       }
     },
     async scanNetwork() {
+      console.log('[Devices] scanNetwork called')
       this.scanning = true
       this.scanDevices = []
       this.scanError = ''
@@ -516,6 +512,7 @@ export default {
 
       // 优先使用客户端代理扫描（本地网络）- 只选择在线的客户端
       const targetClientId = this.selectedClientId || (this.wsClients.length > 0 ? this.wsClients.find(c => c.is_online)?.client_id || '' : '')
+      console.log('[Devices] targetClientId:', targetClientId, 'wsClients:', this.wsClients)
       if (targetClientId) {
         this.scanMode = 'client'
         try {
@@ -534,28 +531,38 @@ export default {
       await this.scanWithBrowser()
     },
     async scanWithBrowser() {
+      console.log('[Devices] scanWithBrowser called')
       const { BrowserScanner } = await import('@/utils/browser-scanner.js')
       const scanner = new BrowserScanner()
 
-      await scanner.scan(
-        (device) => {
-          // 发现设备，添加到列表
-          if (!this.scanDevices.find(d => d.ip_address === device.ip_address)) {
-            this.scanDevices.push(device)
+      try {
+        await scanner.scan(
+          (device) => {
+            console.log('[Devices] Device found:', device.ip_address)
+            // 发现设备，添加到列表
+            if (!this.scanDevices.find(d => d.ip_address === device.ip_address)) {
+              this.scanDevices.push(device)
+            }
+          },
+          (progress) => {
+            console.log('[Devices] Progress:', progress.status, progress.message)
+            this.scanProgress = progress
+            if (progress.status === 'complete') {
+              this.scanning = false
+              // 扫描已完成，重新加载设备列表
+              this.loadDevices()
+            } else if (progress.status === 'error') {
+              this.scanning = false
+              this.scanError = progress.message || 'browser_scan_failed'
+              console.error('[Devices] Scan error:', progress.message)
+            }
           }
-        },
-        (progress) => {
-          this.scanProgress = progress
-          if (progress.status === 'complete') {
-            this.scanning = false
-            // 浏览器扫描完成后，将结果上报到服务器
-            this.reportBrowserScan()
-          } else if (progress.status === 'error') {
-            this.scanning = false
-            this.scanError = progress.message || 'browser_scan_failed'
-          }
-        }
-      )
+        )
+      } catch (e) {
+        console.error('[Devices] scanWithBrowser exception:', e)
+        this.scanning = false
+        this.scanError = e.message || 'browser_scan_failed'
+      }
     },
     async reportBrowserScan() {
       if (this.scanDevices.length === 0) return
