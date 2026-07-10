@@ -71,9 +71,31 @@ def get_arp_table() -> List[Dict[str, str]]:
     devices = []
     seen = set()
 
+    # 只从物理网络接口获取 ARP 表
+    interfaces = []
     if is_macos():
-        for iface in ["en0", "en1"]:
-            try:
+        interfaces = ["en0", "en1", "en2", "en3"]
+    else:
+        # Linux: 只取非 Docker 虚拟接口
+        try:
+            result = subprocess.run(
+                ["ip", "-o", "link", "show"],
+                capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.splitlines():
+                # 格式: "2: eth0: <BROADCAST,..."
+                parts = line.split()
+                if len(parts) >= 2:
+                    iface = parts[1].rstrip(':')
+                    # 排除 Docker/虚拟接口
+                    if not any(x in iface for x in ['docker', 'br-', 'veth', 'virbr', 'lo']):
+                        interfaces.append(iface)
+        except Exception:
+            interfaces = ["eth0", "ens3", "eno1"]
+
+    for iface in interfaces:
+        try:
+            if is_macos():
                 proc = subprocess.Popen(
                     ["arp", "-a", "-i", iface],
                     stdout=subprocess.PIPE,
@@ -81,36 +103,40 @@ def get_arp_table() -> List[Dict[str, str]]:
                     text=True
                 )
                 output, _ = proc.communicate(timeout=10)
-                for line in output.splitlines():
-                    parts = line.split()
-                    if len(parts) >= 4:
-                        ip = parts[1].strip("()")
-                        mac = parts[3]
-                        if "incomplete" in mac.lower() or mac == "ff:ff:ff:ff:ff:ff":
-                            continue
-                        if ip not in seen:
-                            seen.add(ip)
-                            devices.append({"ip_address": ip, "mac_address": mac.upper()})
-            except Exception:
-                continue
-    else:
-        try:
-            result = subprocess.run(
-                ["arp", "-an"],
-                capture_output=True, text=True, timeout=10
-            )
-            for line in result.stdout.splitlines():
+            else:
+                result = subprocess.run(
+                    ["arp", "-i", iface, "-an"],
+                    capture_output=True, text=True, timeout=10
+                )
+                output = result.stdout
+
+            for line in output.splitlines():
                 parts = line.split()
                 if len(parts) >= 4:
-                    ip_match = parts[1].strip("()")
+                    ip = parts[1].strip("()") if is_macos() else parts[1].strip("()")
                     mac = parts[3]
-                    if "incomplete" in mac.lower() or mac == "ff:ff:ff:ff:ff:ff":
+                    
+                    # 过滤无效条目
+                    if "incomplete" in mac.lower():
                         continue
-                    if ip_match not in seen:
-                        seen.add(ip_match)
-                        devices.append({"ip_address": ip_match, "mac_address": mac.upper()})
+                    if mac == "ff:ff:ff:ff:ff:ff":
+                        continue
+                    # 过滤组播 MAC (01:00:5e, 33:33, ff:ff)
+                    mac_lower = mac.lower()
+                    if mac_lower.startswith(("01:00:5e", "33:33", "ff:ff")):
+                        continue
+                    # 过滤回环和链路本地地址
+                    if ip.startswith(("127.", "169.254.")):
+                        continue
+                    # 过滤 Docker/虚拟网络
+                    if ip.startswith(("172.17.", "172.18.", "172.19.", "172.20.")):
+                        continue
+                    
+                    if ip not in seen:
+                        seen.add(ip)
+                        devices.append({"ip_address": ip, "mac_address": mac.upper()})
         except Exception:
-            pass
+            continue
 
     return devices
 

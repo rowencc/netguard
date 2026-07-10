@@ -242,16 +242,30 @@ export default {
     async scanServer() {
       const api = (await import('@/api')).default
       
+      // 模拟进度更新
       this.scanProgress = { status: 'scanning', progress: 10, message: '正在执行 ARP 探测...' }
+      const progressTimer = setInterval(() => {
+        if (this.scanProgress && this.scanProgress.progress < 90) {
+          this.scanProgress = {
+            ...this.scanProgress,
+            progress: this.scanProgress.progress + 5,
+            message: this.scanProgress.progress < 50 ? '正在填充 ARP 表...' : '正在读取设备列表...'
+          }
+        }
+      }, 500)
       
       try {
         const res = await api.post('/devices/scan')
+        clearInterval(progressTimer)
+        this.scanProgress = { status: 'scanning', progress: 95, message: '正在处理结果...' }
         this.resultCount = res.data.device_count || 0
         this.newCount = res.data.new_device_count || 0
         this.alertCount = res.data.alerts_created || 0
+        this.scanProgress = { status: 'complete', progress: 100, message: '扫描完成' }
         this.scanComplete = true
         this.$emit('scan-complete')
       } catch (e) {
+        clearInterval(progressTimer)
         throw new Error(e.response?.data?.detail || '服务端扫描失败')
       }
     },
