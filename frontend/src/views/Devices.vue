@@ -419,9 +419,15 @@ export default {
       this.matching = false
     },
     onScanComplete() {
-      this.loading = false
-      this.loadDevices().then(() => {
-        this.startMatching()
+      // 直接加载设备列表，不触发探活
+      const api_import = import('@/api')
+      api_import.then(({ default: api }) => {
+        api.get('/devices/').then(res => {
+          this.devices = res.data
+          this.loading = false
+          // 设备加载完成后开始识别
+          this.startMatching()
+        })
       })
     },
     async startMatching() {
