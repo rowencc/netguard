@@ -167,6 +167,7 @@ export default {
     visible: Boolean,
     hasClient: Boolean,
     onlineClients: Number,
+    clients: { type: Array, default: () => [] },
   },
   emits: ['close', 'scan-start', 'scan-complete'],
   data() {
@@ -273,10 +274,16 @@ export default {
     async scanClient() {
       const api = (await import('@/api')).default
       
-      this.scanProgress = { status: 'scanning', progress: 10, message: '正在发送扫描指令...' }
+      // 获取在线客户端的 client_id
+      const onlineClient = this.clients.find(c => c.is_online)
+      if (!onlineClient) {
+        throw new Error('没有在线的客户端')
+      }
+      
+      this.scanProgress = { status: 'scanning', progress: 10, message: `正在向 ${onlineClient.hostname || onlineClient.client_id} 发送扫描指令...` }
       
       try {
-        const res = await api.post('/devices/scan-client', { client_id: '' })
+        const res = await api.post('/devices/scan-client', { client_id: onlineClient.client_id })
         this.scanId = res.data.scan_id
         
         // Poll for completion

@@ -303,6 +303,7 @@
       :visible="showScanDialog"
       :has-client="hasClient"
       :online-clients="wsClients.filter(c => c.is_online).length"
+      :clients="wsClients"
       @close="showScanDialog = false"
       @scan-start="onScanStart"
       @scan-complete="loadDevices"
