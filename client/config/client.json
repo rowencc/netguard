@@ -1,5 +1,5 @@
 {
-  "server_url": "https://net.soccn.com",
+  "server_url": "http://localhost:8089",
   "api_key": "netguard-sync-key-2024",
   "client_id": "client-desktop-001",
   "scan_interval": 300,

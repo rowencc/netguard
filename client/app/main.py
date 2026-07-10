@@ -57,6 +57,13 @@ class NetGuardClient:
         
         self.running = True
         
+        # 先执行首次扫描，确保 heartbeat 有设备数据
+        print("[NetGuard Client] Running initial scan...")
+        try:
+            self._perform_scan()
+        except Exception as e:
+            print(f"[Initial Scan Error] {e}")
+        
         self._send_heartbeat()
         
         heartbeat_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)

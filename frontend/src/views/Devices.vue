@@ -60,12 +60,11 @@
           </svg>
           {{ (loading || checking) ? t('devices.checking') : t('devices.refresh') }}
         </button>
-        <button class="btn btn-primary" @click="scanNetwork" :disabled="scanning">
-          <svg v-if="!scanning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <button class="btn btn-primary" @click="showScanDialog = true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <span v-if="scanning" class="spinner"></span>
-          {{ scanning ? t('devices.scanning') : t('devices.scan') }}
+          {{ t('devices.scan') }}
         </button>
       </div>
     </header>
@@ -207,35 +206,14 @@
 
       <!-- 无客户端代理连接 - 显示两种扫描方式 -->
       <template v-else-if="!hasClient">
-        <p class="empty-text">{{ t('devices.chooseScanMode') }}</p>
-        <p class="empty-hint" style="margin-bottom: 20px;">{{ t('devices.chooseScanModeHint') }}</p>
-
-        <div class="scan-options">
-          <!-- 浏览器扫描选项 -->
-          <div class="scan-option" @click="scanNetwork">
-            <div class="option-icon browser-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;">
-                <path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
-            </div>
-            <div class="option-info">
-              <h4>{{ t('devices.browserScan') }}</h4>
-              <p>{{ t('devices.browserScanDesc') }}</p>
-            </div>
-          </div>
-
-          <!-- 客户端代理选项 -->
-          <div class="scan-option">
-            <div class="option-icon client-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;">
-                <path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-              </svg>
-            </div>
-            <div class="option-info">
-              <h4>{{ t('devices.clientScan') }}</h4>
-              <p>{{ t('devices.clientScanDesc') }}</p>
-            </div>
-          </div>
+        <p class="empty-text">{{ t('devices.noDevices') }}</p>
+        <p class="empty-hint" style="margin-bottom: 20px;">{{ t('devices.clickScanToStart') }}</p>
+        <button class="btn btn-primary" @click="showScanDialog = true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;">
+            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {{ t('devices.scan') }}
+        </button>
         </div>
 
         <!-- 安装客户端指南（折叠） -->
@@ -320,6 +298,15 @@
         <p class="empty-hint">{{ t('devices.clickScanToStart') }}</p>
       </template>
     </div>
+
+    <!-- 扫描对话框 -->
+    <ScanDialog 
+      :visible="showScanDialog"
+      :has-client="hasClient"
+      :online-clients="wsClients.filter(c => c.is_online).length"
+      @close="showScanDialog = false"
+      @scan-complete="loadDevices"
+    />
   </div>
 </template>
 
@@ -328,9 +315,10 @@ import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useWebSocket } from '@/composables/useWebSocket'
 import ClientList from '@/components/ClientList.vue'
+import ScanDialog from '@/components/ScanDialog.vue'
 
 export default {
-  components: { ClientList },
+  components: { ClientList, ScanDialog },
   setup() {
     const { t } = useI18n()
     const { connected, clients: wsClients, scanProgress, requestScan, onMessage } = useWebSocket()
@@ -357,6 +345,7 @@ export default {
       editingDevice: null,
       editingField: '',
       editValue: '',
+      showScanDialog: false,
     }
   },
   computed: {

@@ -21,6 +21,9 @@ class NetworkScanner:
         return ":".join(p.zfill(2).upper() for p in parts)
 
     def scan_network(self, network: Optional[str] = None) -> List[Dict]:
+        # Step 1: Ping sweep to populate ARP table
+        self._ping_sweep(network)
+        
         arp_devices = self._arp_table(network)
         devices = []
         for d in arp_devices:
@@ -36,6 +39,64 @@ class NetworkScanner:
                 "device_type_hint": device_type
             })
         return devices
+
+    def _ping_sweep(self, network: Optional[str] = None):
+        """Ping sweep to populate ARP table before reading it"""
+        from app.services.platform_compat import get_network_info
+        import concurrent.futures
+        
+        # Determine which subnets to scan
+        subnets = []
+        if network:
+            subnets = [network]
+        else:
+            # Scan all known subnets
+            subnets = ["192.168.100.0/24", "192.168.101.0/24", "192.168.103.0/24"]
+            # Also scan the local subnet
+            try:
+                info = get_network_info()
+                local_ip = info.get("local_ip", "")
+                if local_ip and local_ip != "127.0.0.1":
+                    parts = local_ip.split(".")
+                    if len(parts) == 4:
+                        local_subnet = f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
+                        if local_subnet not in subnets:
+                            subnets.insert(0, local_subnet)
+            except Exception:
+                pass
+        
+        def ping_host(ip):
+            try:
+                import sys
+                if sys.platform == "darwin":
+                    subprocess.run(
+                        ["ping", "-c", "1", "-W", "0.3", ip],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=1
+                    )
+                else:
+                    subprocess.run(
+                        ["ping", "-c", "1", "-W", "0.3", ip],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=1
+                    )
+            except Exception:
+                pass
+        
+        # Generate all IPs to ping
+        all_ips = []
+        for subnet in subnets:
+            parts = subnet.replace("/24", "").split(".")
+            if len(parts) == 4:
+                prefix = f"{parts[0]}.{parts[1]}.{parts[2]}"
+                for i in range(1, 255):
+                    all_ips.append(f"{prefix}.{i}")
+        
+        # Ping in parallel (50 concurrent)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+            executor.map(ping_host, all_ips)
 
     def _arp_table(self, network: Optional[str] = None) -> List[Dict]:
         devices = []
