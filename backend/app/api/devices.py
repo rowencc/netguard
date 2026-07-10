@@ -215,6 +215,75 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
     db.commit()
     return {"device_count": scanned, "new_device_count": new_count, "alerts_created": 0}
 
+
+@router.get("/match")
+def match_devices(db: Session = Depends(get_db)):
+    """逐个匹配设备的厂商和类型信息，返回所有设备的匹配结果"""
+    from app.services.vendor_lookup import VendorLookup
+    from app.api.corrections import get_learned_device_type, get_learned_vendor
+    
+    vendor_lookup = VendorLookup()
+    
+    type_keywords = {
+        'router': ['router', 'gateway', 'h3c', 'cisco', 'tp-link', 'mercury', 'd-link', 'netgear', 'tenda', 'huawei', 'mikrotik'],
+        'camera': ['camera', 'hikvision', 'dahua', 'uniview', 'tiandy'],
+        'switch': ['switch', 'aruba', 'hpe', 'dell networking'],
+        'printer': ['printer', 'ricoh', 'canon', 'hp inc.', 'epson', 'brother', 'xerox'],
+        'phone': ['phone', 'iphone', 'samsung', 'huawei mobile', 'xiaomi mobile', 'oppo', 'vivo'],
+        'tv': ['tv', 'samsung tv', 'lg tv', 'sony tv', 'xiaomi tv', 'tcl'],
+        'speaker': ['speaker', 'sonos', 'homepod', 'echo', 'google home'],
+        'computer': ['computer', 'laptop', 'desktop', 'macbook', 'dell inc.', 'lenovo', 'asus', 'acer'],
+        'iot': ['espressif', 'iot', 'smart', 'sensor', 'tuya'],
+    }
+    
+    devices = db.query(Device).all()
+    matched = []
+    
+    for device in devices:
+        mac = device.mac_address or ""
+        vendor = device.vendor or ""
+        device_type = device.device_type or "unknown"
+        
+        # 1. 先查比对库
+        mac_prefix = mac[:8]
+        learned_type = get_learned_device_type(mac_prefix, db)
+        learned_vendor = get_learned_vendor(mac_prefix, db)
+        if learned_type:
+            device_type = learned_type
+        if learned_vendor:
+            vendor = learned_vendor
+        
+        # 2. 如果厂商为空，用 OUI 库查找
+        if not vendor and mac:
+            vendor = vendor_lookup.lookup(mac) or ""
+        
+        # 3. 如果类型未知，从厂商名推断
+        if device_type == "unknown" and vendor:
+            vendor_lower = vendor.lower()
+            for dtype, keywords in type_keywords.items():
+                if any(kw in vendor_lower for kw in keywords):
+                    device_type = dtype
+                    break
+        
+        # 更新数据库
+        if vendor and vendor != device.vendor:
+            device.vendor = vendor
+        if device_type != device.device_type:
+            device.device_type = device_type
+        
+        matched.append({
+            "id": device.id,
+            "ip_address": device.ip_address,
+            "mac_address": device.mac_address,
+            "hostname": device.hostname or "",
+            "vendor": vendor,
+            "device_type": device_type,
+        })
+    
+    db.commit()
+    return {"devices": matched, "total": len(matched)}
+
+
 @router.put("/{device_id}")
 def update_device(
     device_id: int,

@@ -384,8 +384,9 @@ export default {
     async startMatching() {
       const api = (await import('@/api')).default
       try {
-        const res = await api.get('/devices/')
-        const devices = res.data
+        // 调用后端匹配接口，逐个查找厂商和类型
+        const res = await api.get('/devices/match')
+        const devices = res.data.devices || []
         this.matchTotal = devices.length
         this.matching = true
         this.matchLog = []
