@@ -204,7 +204,7 @@
         <div class="spinner-large"></div>
       </template>
 
-      <!-- 无客户端代理连接 - 显示两种扫描方式 -->
+      <!-- 无客户端代理连接 - 显示扫描按钮 -->
       <template v-else-if="!hasClient">
         <p class="empty-text">{{ t('devices.noDevices') }}</p>
         <p class="empty-hint" style="margin-bottom: 20px;">{{ t('devices.clickScanToStart') }}</p>
@@ -214,7 +214,6 @@
           </svg>
           {{ t('devices.scan') }}
         </button>
-        </div>
 
         <!-- 安装客户端指南（折叠） -->
         <details class="install-details">
@@ -305,6 +304,7 @@
       :has-client="hasClient"
       :online-clients="wsClients.filter(c => c.is_online).length"
       @close="showScanDialog = false"
+      @scan-start="onScanStart"
       @scan-complete="loadDevices"
     />
   </div>
@@ -392,6 +392,10 @@ export default {
     }
   },
   methods: {
+    onScanStart() {
+      this.devices = []
+      this.loading = true
+    },
     handleWsMessage(data) {
       if (data.type === 'scan_progress' && data.scan_id === this.scanId) {
         const progress = data.data

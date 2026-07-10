@@ -130,6 +130,8 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
 
 @router.post("/scan")
 def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
+    from app.api.corrections import get_learned_device_type, get_learned_vendor
+    
     existing_devices = db.query(Device).all()
     existing_ips = {d.ip_address: d for d in existing_devices}
     existing_macs = {d.mac_address.upper(): d for d in existing_devices if d.mac_address}
@@ -148,6 +150,15 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
         device_type = dev_data.get("device_type_hint", "unknown")
         hostname = dev_data.get("hostname", "")
         hostname_source = dev_data.get("hostname_source", "")
+        
+        # 使用已学习的设备类型和厂商
+        mac_prefix = mac[:8]
+        learned_type = get_learned_device_type(mac_prefix, db)
+        learned_vendor = get_learned_vendor(mac_prefix, db)
+        if learned_type:
+            device_type = learned_type
+        if learned_vendor:
+            vendor = learned_vendor
 
         existing = existing_macs.get(mac.upper()) or existing_ips.get(ip)
         if existing:
@@ -155,7 +166,7 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
             existing.ip_address = ip
             if mac:
                 existing.mac_address = mac
-                existing.mac_prefix = mac[:8]
+                existing.mac_prefix = mac_prefix
             if hostname:
                 existing.hostname = hostname
                 existing.hostname_source = hostname_source
@@ -167,7 +178,7 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
         else:
             new_device = Device(
                 mac_address=mac,
-                mac_prefix=mac[:8],
+                mac_prefix=mac_prefix,
                 vendor=vendor,
                 device_type=device_type,
                 ip_address=ip,

@@ -168,7 +168,7 @@ export default {
     hasClient: Boolean,
     onlineClients: Number,
   },
-  emits: ['close', 'scan-complete'],
+  emits: ['close', 'scan-start', 'scan-complete'],
   data() {
     return {
       scanMode: 'server',
@@ -226,6 +226,7 @@ export default {
     async startScan() {
       this.scanning = true
       this.scanError = ''
+      this.$emit('scan-start')
       
       try {
         if (this.scanMode === 'server') {
