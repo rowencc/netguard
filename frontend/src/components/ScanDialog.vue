@@ -312,6 +312,7 @@ export default {
           }
           
           if (status.status === 'complete') {
+            this.scanProgress = { status: 'complete', progress: 100, message: '扫描完成' }
             this.resultCount = status.device_count || 0
             this.newCount = status.new_device_count || 0
             return
