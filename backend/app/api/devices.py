@@ -661,12 +661,16 @@ def scan_browser(body: dict, db: Session = Depends(get_db)):
         ports = dev_data.get("ports", [])
 
         # Browser can't get MAC addresses, generate a temporary one based on IP
-        # Format: AA:BB:CC:DD:EE:FF where DD:EE:FF is derived from IP
+        # Format: 02:XX:XX:XX:XX:XX where XX:XX:XX:XX is derived from IP (17 chars max)
         ip_parts = ip.split(".")
         if len(ip_parts) == 4:
-            temp_mac = f"BROWSER:{ip_parts[0]:02X}:{ip_parts[1]:02X}:{ip_parts[2]:02X}:{ip_parts[3]:02X}"
+            try:
+                # Use last 4 bytes of IP, prefix with 02 (locally administered)
+                temp_mac = f"02:{int(ip_parts[0]):02X}:{int(ip_parts[1]):02X}:{int(ip_parts[2]):02X}:{int(ip_parts[3]):02X}"
+            except ValueError:
+                temp_mac = f"02:00:00:00:{(scanned >> 8) & 0xFF:02X}:{scanned & 0xFF:02X}"
         else:
-            temp_mac = f"BROWSER:{scanned:06X}"
+            temp_mac = f"02:00:00:00:{(scanned >> 8) & 0xFF:02X}:{scanned & 0xFF:02X}"
 
         # Try to identify device from ports
         identified = identifier.identify_device({
