@@ -238,11 +238,28 @@ def match_devices(db: Session = Depends(get_db)):
     
     devices = db.query(Device).all()
     matched = []
+    to_delete = []
     
     for device in devices:
+        ip = device.ip_address or ""
         mac = device.mac_address or ""
         vendor = device.vendor or ""
         device_type = device.device_type or "unknown"
+        
+        # 过滤多播/广播地址
+        if ip.startswith(('224.', '225.', '226.', '227.', '228.', '229.', '230.', '231.', '232.', '233.', '234.', '235.', '236.', '237.', '238.', '239.', '255.')):
+            to_delete.append(device)
+            continue
+        
+        # 过滤本地管理 MAC（第2位为 2,6,A,E）
+        if mac and len(mac) >= 2:
+            try:
+                second_char = int(mac[1], 16)
+                if second_char & 2:
+                    to_delete.append(device)
+                    continue
+            except ValueError:
+                pass
         
         # 1. 先查比对库
         mac_prefix = mac[:8]
@@ -279,6 +296,10 @@ def match_devices(db: Session = Depends(get_db)):
             "vendor": vendor,
             "device_type": device_type,
         })
+    
+    # 删除无效设备
+    for device in to_delete:
+        db.delete(device)
     
     db.commit()
     return {"devices": matched, "total": len(matched)}
