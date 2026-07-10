@@ -132,14 +132,13 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
 def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
     from app.api.corrections import get_learned_device_type, get_learned_vendor
     
-    existing_devices = db.query(Device).all()
-    existing_ips = {d.ip_address: d for d in existing_devices}
-    existing_macs = {d.mac_address.upper(): d for d in existing_devices if d.mac_address}
+    # 清空旧设备列表（比对库 DeviceCorrection 不受影响）
+    db.query(Device).delete()
+    db.commit()
 
     devices = scanner.scan_network(network)
     new_count = 0
     scanned = 0
-    alerts_created = 0
     for dev_data in devices:
         mac = dev_data.get("mac_address", "")
         ip = dev_data.get("ip_address", "")
@@ -151,7 +150,7 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
         hostname = dev_data.get("hostname", "")
         hostname_source = dev_data.get("hostname_source", "")
         
-        # 使用已学习的设备类型和厂商
+        # 使用比对库匹配设备类型和厂商（MAC 前 8 位）
         mac_prefix = mac[:8]
         learned_type = get_learned_device_type(mac_prefix, db)
         learned_vendor = get_learned_vendor(mac_prefix, db)
@@ -160,38 +159,23 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
         if learned_vendor:
             vendor = learned_vendor
 
-        existing = existing_macs.get(mac.upper()) or existing_ips.get(ip)
-        if existing:
-            existing.last_seen = func.now()
-            existing.ip_address = ip
-            if mac:
-                existing.mac_address = mac
-                existing.mac_prefix = mac_prefix
-            if hostname:
-                existing.hostname = hostname
-                existing.hostname_source = hostname_source
-            if vendor:
-                existing.vendor = vendor
-            if device_type and device_type != "unknown":
-                existing.device_type = device_type
-            existing.scan_source = "server"
-        else:
-            new_device = Device(
-                mac_address=mac,
-                mac_prefix=mac_prefix,
-                vendor=vendor,
-                device_type=device_type,
-                ip_address=ip,
-                hostname=hostname,
-                hostname_source=hostname_source,
-                risk_level="LOW",
-                is_authorized=False,
-                scan_source="server",
-            )
-            db.add(new_device)
-            new_count += 1
+        new_device = Device(
+            mac_address=mac,
+            mac_prefix=mac_prefix,
+            vendor=vendor,
+            device_type=device_type,
+            ip_address=ip,
+            hostname=hostname,
+            hostname_source=hostname_source,
+            risk_level="LOW",
+            is_authorized=False,
+            scan_source="server",
+        )
+        db.add(new_device)
+        new_count += 1
+
     db.commit()
-    return {"device_count": scanned, "new_device_count": new_count, "alerts_created": alerts_created}
+    return {"device_count": scanned, "new_device_count": new_count, "alerts_created": 0}
 
 @router.put("/{device_id}")
 def update_device(
@@ -576,6 +560,10 @@ async def scan_client(body: dict, db: Session = Depends(get_db)):
 
     if not manager.is_client_online(client_id):
         raise HTTPException(status_code=400, detail=f"Client {client_id} is not connected")
+
+    # 清空旧设备列表（比对库 DeviceCorrection 不受影响）
+    db.query(Device).delete()
+    db.commit()
 
     scan_id = str(uuid.uuid4())
 
