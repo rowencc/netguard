@@ -62,12 +62,14 @@ export class BrowserScanner {
 
   /**
    * 通过探测常见端口来发现设备
+   * 使用多种方法提高可靠性
    */
-  async probeDevice(ip, timeout = 800) {
+  async probeDevice(ip, timeout = 1000) {
     const commonPorts = [80, 443, 8080, 8443, 554, 8000, 8888]
     const foundPorts = []
 
-    const probePromises = commonPorts.map(port => {
+    // Method 1: Image loading (works for HTTP servers)
+    const imageProbePromises = commonPorts.map(port => {
       return new Promise((resolve) => {
         const img = new Image()
         const timer = setTimeout(() => {
@@ -80,7 +82,7 @@ export class BrowserScanner {
         }
         img.onerror = () => {
           clearTimeout(timer)
-          // onerror 也表示端口开放（服务器返回了非图片内容）
+          // onerror also indicates port is open (server returned non-image content)
           resolve(port)
         }
 
@@ -88,8 +90,41 @@ export class BrowserScanner {
       })
     })
 
-    const results = await Promise.all(probePromises)
-    return results.filter(p => p !== null)
+    // Method 2: Fetch API with no-cors (more reliable for HTTPS)
+    const fetchProbePromises = commonPorts.map(port => {
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          resolve(null)
+        }, timeout)
+
+        fetch(`http://${ip}:${port}/`, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          signal: AbortSignal.timeout(timeout)
+        })
+          .then(() => {
+            clearTimeout(timer)
+            resolve(port)
+          })
+          .catch(() => {
+            clearTimeout(timer)
+            resolve(null)
+          })
+      })
+    })
+
+    // Run both methods in parallel
+    const [imageResults, fetchResults] = await Promise.all([
+      Promise.all(imageProbePromises),
+      Promise.all(fetchProbePromises)
+    ])
+
+    // Combine results
+    const allPorts = new Set()
+    imageResults.filter(Boolean).forEach(p => allPorts.add(p))
+    fetchResults.filter(Boolean).forEach(p => allPorts.add(p))
+
+    return Array.from(allPorts)
   }
 
   /**
@@ -100,17 +135,23 @@ export class BrowserScanner {
   async scan(onDeviceFound, onProgress) {
     try {
       // 获取本地 IP
-      onProgress({ status: 'detecting_ip' })
+      onProgress({ status: 'detecting_ip', message: '正在检测本地IP地址...' })
       this.localIP = await this.getLocalIP()
 
       if (!this.localIP) {
-        throw new Error('无法获取本地 IP 地址')
+        throw new Error('无法获取本地IP地址。请确保浏览器有WebRTC权限。')
       }
 
       this.subnet = this.getSubnet(this.localIP)
-      onProgress({ status: 'scanning', localIP: this.localIP, subnet: this.subnet })
+      onProgress({ 
+        status: 'scanning', 
+        localIP: this.localIP, 
+        subnet: this.subnet,
+        message: `检测到本地网络: ${this.subnet}.0/24`
+      })
 
       // 扫描当前 IP（本机）
+      onProgress({ status: 'scanning', message: '正在扫描本机...', progress: 0 })
       const localPorts = await this.probeDevice(this.localIP)
       if (localPorts.length > 0) {
         onDeviceFound({
@@ -126,6 +167,7 @@ export class BrowserScanner {
       // 扫描网关
       const gateway = `${this.subnet}.1`
       if (gateway !== this.localIP) {
+        onProgress({ status: 'scanning', message: '正在扫描网关...', progress: 1 })
         const gatewayPorts = await this.probeDevice(gateway)
         if (gatewayPorts.length > 0) {
           onDeviceFound({
@@ -145,18 +187,28 @@ export class BrowserScanner {
         scanRange.push(`${this.subnet}.${i}`)
       }
 
-      // 分批扫描，每批 20 个 IP
-      const batchSize = 20
-      for (let i = 0; i < scanRange.length; i += batchSize) {
-        const batch = scanRange.slice(i, i + batchSize)
-        const progress = Math.round((i / scanRange.length) * 100)
-        onProgress({ status: 'scanning', progress, current: i, total: scanRange.length })
+      // 分批扫描，每批 10 个 IP (smaller batch for better progress updates)
+      const batchSize = 10
+      const totalBatches = Math.ceil(scanRange.length / batchSize)
+      
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const startIdx = batchIndex * batchSize
+        const batch = scanRange.slice(startIdx, startIdx + batchSize)
+        const progress = Math.round((batchIndex / totalBatches) * 100)
+        
+        onProgress({ 
+          status: 'scanning', 
+          progress, 
+          current: startIdx + batch.length, 
+          total: scanRange.length,
+          message: `正在扫描第 ${batchIndex + 1}/${totalBatches} 批...`
+        })
 
         const batchResults = await Promise.all(
           batch.map(async (ip) => {
             if (ip === this.localIP || ip === gateway) return null
             try {
-              const ports = await this.probeDevice(ip, 500)
+              const ports = await this.probeDevice(ip, 800)
               if (ports.length > 0) {
                 return {
                   ip_address: ip,
@@ -168,7 +220,7 @@ export class BrowserScanner {
                 }
               }
             } catch (e) {
-              // 忽略错误
+              // Ignore errors for individual IPs
             }
             return null
           })
@@ -177,7 +229,7 @@ export class BrowserScanner {
         batchResults.filter(Boolean).forEach(device => onDeviceFound(device))
       }
 
-      onProgress({ status: 'complete' })
+      onProgress({ status: 'complete', message: '扫描完成' })
       return true
     } catch (e) {
       onProgress({ status: 'error', message: e.message })

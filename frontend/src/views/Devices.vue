@@ -196,10 +196,10 @@
       <template v-if="scanning">
         <p class="empty-text">{{ scanMode === 'browser' ? t('devices.browserScanning') : t('devices.scanning') }}</p>
         <p class="empty-hint" v-if="scanProgress && scanProgress.status === 'scanning'">
-          {{ t('devices.scanProgress', { current: scanProgress.current || 0, total: scanProgress.total || 254 }) }}
+          {{ scanProgress.message || t('devices.scanProgress', { current: scanProgress.current || 0, total: scanProgress.total || 254 }) }}
         </p>
         <p class="empty-hint" v-else-if="scanProgress && scanProgress.status === 'detecting_ip'">
-          {{ t('devices.detectingIP') }}
+          {{ scanProgress.message || t('devices.detectingIP') }}
         </p>
         <p class="empty-hint" v-else>{{ t('devices.scanningHint') }}</p>
         <div class="spinner-large"></div>
@@ -552,7 +552,7 @@ export default {
             this.reportBrowserScan()
           } else if (progress.status === 'error') {
             this.scanning = false
-            this.scanError = 'browser_scan_failed'
+            this.scanError = progress.message || 'browser_scan_failed'
           }
         }
       )

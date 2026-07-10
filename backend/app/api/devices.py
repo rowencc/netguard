@@ -634,68 +634,89 @@ async def scan_client(body: dict, db: Session = Depends(get_db)):
 @router.post("/scan-browser")
 def scan_browser(body: dict, db: Session = Depends(get_db)):
     client_ip = body.get("client_ip", "")
+    browser_devices = body.get("devices", [])
 
     if not client_ip:
         raise HTTPException(status_code=400, detail="client_ip is required")
 
-    ip_parts = client_ip.split(".")
-    if len(ip_parts) != 4:
-        raise HTTPException(status_code=400, detail="Invalid IP format")
-
-    subnet = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.0/24"
+    if not browser_devices:
+        raise HTTPException(status_code=400, detail="No devices provided from browser scan")
 
     existing_devices = db.query(Device).all()
-    existing_macs = {d.mac_address.upper(): d for d in existing_devices}
+    existing_ips = {d.ip_address: d for d in existing_devices}
+    existing_macs = {d.mac_address.upper(): d for d in existing_devices if d.mac_address}
 
-    devices = scanner.scan_network(subnet)
     new_count = 0
     scanned = 0
     alerts_created = 0
 
-    for dev_data in devices:
-        mac = dev_data.get("mac_address", "")
-        if not mac:
+    for dev_data in browser_devices:
+        ip = dev_data.get("ip_address", "")
+        if not ip:
             continue
-        scanned += 1
-        identified = identifier.identify_device(dev_data)
-        ip = dev_data["ip_address"]
-        vendor = identified.get("vendor", "")
-        device_type = identified.get("device_type", "unknown")
-        risk_level = identified.get("risk_level", "LOW")
-        hostname = dev_data.get("hostname", "")
-        hostname_source = dev_data.get("hostname_source", "")
 
-        existing = existing_macs.get(mac.upper())
+        scanned += 1
+        hostname = dev_data.get("hostname", "")
+        device_type = dev_data.get("device_type", "unknown")
+        ports = dev_data.get("ports", [])
+
+        # Browser can't get MAC addresses, generate a temporary one based on IP
+        # Format: AA:BB:CC:DD:EE:FF where DD:EE:FF is derived from IP
+        ip_parts = ip.split(".")
+        if len(ip_parts) == 4:
+            temp_mac = f"BROWSER:{ip_parts[0]:02X}:{ip_parts[1]:02X}:{ip_parts[2]:02X}:{ip_parts[3]:02X}"
+        else:
+            temp_mac = f"BROWSER:{scanned:06X}"
+
+        # Try to identify device from ports
+        identified = identifier.identify_device({
+            "ip_address": ip,
+            "mac_address": temp_mac,
+            "hostname": hostname,
+            "open_ports": {p: "" for p in ports}
+        })
+        vendor = identified.get("vendor", "")
+        risk_level = identified.get("risk_level", "LOW")
+
+        # Check if device already exists by IP
+        existing = existing_ips.get(ip)
         if existing:
             existing.last_seen = func.now()
-            existing.ip_address = ip
             if hostname:
                 existing.hostname = hostname
-                existing.hostname_source = hostname_source
-            if vendor:
-                existing.vendor = vendor
-            if device_type:
+                existing.hostname_source = "browser"
+            if device_type and device_type != "unknown":
                 existing.device_type = device_type
             if risk_level:
                 existing.risk_level = risk_level
             existing.scan_source = "browser"
             device_id = existing.id
         else:
-            new_device = Device(
-                mac_address=mac,
-                mac_prefix=mac[:8],
-                vendor=vendor,
-                device_type=device_type,
-                ip_address=ip,
-                hostname=hostname,
-                hostname_source=hostname_source,
-                risk_level=risk_level,
-                scan_source="browser",
-            )
-            db.add(new_device)
-            db.flush()
-            device_id = new_device.id
-            new_count += 1
+            # Check if MAC already exists (shouldn't happen with browser, but just in case)
+            existing_by_mac = existing_macs.get(temp_mac.upper())
+            if existing_by_mac:
+                existing_by_mac.last_seen = func.now()
+                existing_by_mac.ip_address = ip
+                if hostname:
+                    existing_by_mac.hostname = hostname
+                    existing_by_mac.hostname_source = "browser"
+                device_id = existing_by_mac.id
+            else:
+                new_device = Device(
+                    mac_address=temp_mac,
+                    mac_prefix=temp_mac[:8],
+                    vendor=vendor,
+                    device_type=device_type,
+                    ip_address=ip,
+                    hostname=hostname,
+                    hostname_source="browser",
+                    risk_level=risk_level,
+                    scan_source="browser",
+                )
+                db.add(new_device)
+                db.flush()
+                device_id = new_device.id
+                new_count += 1
 
         if risk_level in ("HIGH", "CRITICAL"):
             hostname_display = hostname or "--"
