@@ -600,6 +600,20 @@ async def scan_client(body: dict, db: Session = Depends(get_db)):
     return {"status": "pending", "scan_id": scan_id, "client_id": client_id}
 
 
+@router.get("/scan-client/{scan_id}")
+def get_scan_client_status(scan_id: str, db: Session = Depends(get_db)):
+    record = db.query(ScanRecord).filter(ScanRecord.scan_id == scan_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    return {
+        "scan_id": record.scan_id,
+        "status": record.status,
+        "device_count": record.device_count or 0,
+        "new_device_count": record.new_device_count or 0,
+    }
+
+
 @router.post("/scan-browser")
 def scan_browser(body: dict, db: Session = Depends(get_db)):
     client_ip = body.get("client_ip", "")

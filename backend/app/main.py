@@ -342,7 +342,7 @@ async def ws_client(websocket: WebSocket, client_id: str):
                 try:
                     record = db.query(ScanRecord).filter(ScanRecord.scan_id == scan_id).first()
                     if record:
-                        record.status = "done"
+                        record.status = "complete"
                         record.device_count = data.get("device_count", 0)
                         record.new_device_count = data.get("new_device_count", 0)
                         record.completed_at = func.now()
