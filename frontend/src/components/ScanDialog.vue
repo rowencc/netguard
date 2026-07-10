@@ -291,7 +291,6 @@ export default {
         this.alertCount = res.data.alerts_created || 0
         this.scanProgress = { status: 'complete', progress: 100, message: '扫描完成' }
         this.scanComplete = true
-        await this.startMatching()
       } catch (e) {
         clearInterval(progressTimer)
         throw new Error(e.response?.data?.detail || '服务端扫描失败')
@@ -315,7 +314,6 @@ export default {
         // Poll for completion
         await this.pollClientScan()
         this.scanComplete = true
-        await this.startMatching()
       } catch (e) {
         throw new Error(e.response?.data?.detail || '客户端扫描失败')
       }
@@ -376,7 +374,6 @@ export default {
       if (devices.length > 0) {
         this.resultCount = devices.length
         this.scanComplete = true
-        await this.startMatching()
       } else {
         throw new Error('浏览器扫描未发现设备，请尝试其他扫描方式')
       }

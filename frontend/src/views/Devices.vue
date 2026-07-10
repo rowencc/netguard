@@ -420,7 +420,39 @@ export default {
     },
     onScanComplete() {
       this.loading = false
-      this.loadDevices()
+      this.loadDevices().then(() => {
+        this.startMatching()
+      })
+    },
+    async startMatching() {
+      const api = (await import('@/api')).default
+      try {
+        const res = await api.get('/devices/match')
+        const devices = res.data.devices || []
+        this.matchTotal = devices.length
+        this.matching = true
+        this.matchCurrent = 0
+
+        for (let i = 0; i < devices.length; i++) {
+          const d = devices[i]
+          this.matchCurrent = i + 1
+          this.matchProgress = Math.round((this.matchCurrent / this.matchTotal) * 100)
+          
+          // 实时更新设备列表中的厂商和类型
+          const device = this.devices.find(dev => dev.id === d.id)
+          if (device) {
+            device.vendor = d.vendor || ''
+            device.device_type = d.device_type || 'unknown'
+          }
+          
+          await new Promise(r => setTimeout(r, 60))
+        }
+
+        await new Promise(r => setTimeout(r, 300))
+        this.matching = false
+      } catch (e) {
+        this.matching = false
+      }
     },
     onMatchProgress(data) {
       this.matching = true
