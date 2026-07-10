@@ -190,7 +190,7 @@ export default {
     onlineClients: Number,
     clients: { type: Array, default: () => [] },
   },
-  emits: ['close', 'scan-start', 'scan-complete'],
+  emits: ['close', 'scan-start', 'scan-complete', 'match-progress', 'match-complete'],
   data() {
     return {
       scanMode: 'server',
@@ -400,26 +400,37 @@ export default {
           const vendor = d.vendor || ''
           const deviceType = d.device_type || 'unknown'
           
+          // 发送匹配进度事件，更新设备列表
+          this.$emit('match-progress', {
+            device_id: d.id,
+            ip_address: d.ip_address,
+            vendor: vendor,
+            device_type: deviceType,
+            progress: this.matchPercent,
+            current: this.matchCurrent,
+            total: this.matchTotal,
+          })
+          
           this.matchLog.unshift({
             ip: d.ip_address || '',
             type: deviceType,
             vendor: vendor,
-            isNew: d.mac_address && d.mac_address.startsWith('02:'),
           })
           
-          // 保持最多显示 5 条
           if (this.matchLog.length > 5) {
             this.matchLog.pop()
           }
           
-          await new Promise(r => setTimeout(r, 80))
+          await new Promise(r => setTimeout(r, 60))
         }
 
-        await new Promise(r => setTimeout(r, 500))
+        await new Promise(r => setTimeout(r, 300))
         this.matching = false
+        this.$emit('match-complete')
         this.$emit('scan-complete')
       } catch (e) {
         this.matching = false
+        this.$emit('match-complete')
         this.$emit('scan-complete')
       }
     },

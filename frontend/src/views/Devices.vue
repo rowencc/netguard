@@ -78,6 +78,19 @@
       </select>
     </div>
 
+    <!-- 识别进度条 -->
+    <div v-if="matching" class="match-bar-container">
+      <div class="match-bar-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="match-bar-icon">
+          <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        <span>正在识别设备指纹... {{ matchCurrent }}/{{ matchTotal }}</span>
+      </div>
+      <div class="match-bar-track">
+        <div class="match-bar-fill" :style="{ width: matchProgress + '%' }"></div>
+      </div>
+    </div>
+
     <!-- Desktop Table -->
     <div class="table-container desktop-only">
       <table class="data-table">
@@ -306,7 +319,9 @@
       :clients="wsClients"
       @close="showScanDialog = false"
       @scan-start="onScanStart"
-      @scan-complete="loadDevices"
+      @scan-complete="onScanComplete"
+      @match-progress="onMatchProgress"
+      @match-complete="onMatchComplete"
     />
   </div>
 </template>
@@ -347,6 +362,10 @@ export default {
       editingField: '',
       editValue: '',
       showScanDialog: false,
+      matching: false,
+      matchProgress: 0,
+      matchCurrent: 0,
+      matchTotal: 0,
     }
   },
   computed: {
@@ -397,6 +416,28 @@ export default {
       this.devices = []
       this.scanDevices = []
       this.loading = true
+      this.matching = false
+    },
+    onScanComplete() {
+      this.loading = false
+      this.loadDevices()
+    },
+    onMatchProgress(data) {
+      this.matching = true
+      this.matchProgress = data.progress
+      this.matchCurrent = data.current
+      this.matchTotal = data.total
+      
+      // 实时更新设备列表中的厂商和类型
+      const device = this.devices.find(d => d.id === data.device_id)
+      if (device) {
+        device.vendor = data.vendor
+        device.device_type = data.device_type
+      }
+    },
+    onMatchComplete() {
+      this.matching = false
+      this.loadDevices()
     },
     handleWsMessage(data) {
       if (data.type === 'scan_progress' && data.scan_id === this.scanId) {
@@ -812,6 +853,50 @@ export default {
   outline: none;
   border-color: var(--color-primary-focus);
   box-shadow: 0 0 0 2px rgba(94, 106, 210, 0.2);
+}
+
+/* 匹配进度条 */
+.match-bar-container {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: var(--space-md);
+}
+
+.match-bar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--color-ink-muted);
+}
+
+.match-bar-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  animation: matchSpin 1.5s linear infinite;
+}
+
+@keyframes matchSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.match-bar-track {
+  height: 4px;
+  background: var(--color-surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.match-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 2px;
+  transition: width 150ms ease;
 }
 
 .table-container {
