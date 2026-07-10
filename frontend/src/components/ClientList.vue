@@ -1,6 +1,14 @@
 <template>
   <div class="client-list">
-    <h3 class="client-title">{{ t('clients.title') }}</h3>
+    <div class="client-header">
+      <h3 class="client-title">{{ t('clients.title') }}</h3>
+      <button class="btn-info" @click="showInstallGuide = true" title="客户端管理">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 16v-4m0-4h.01"></path>
+        </svg>
+      </button>
+    </div>
     <div v-if="clients.length === 0" class="client-empty">
       {{ t('clients.noClients') }}
     </div>
@@ -71,6 +79,95 @@
         </div>
       </div>
     </div>
+
+    <!-- 客户端管理指南 -->
+    <div v-if="showInstallGuide" class="upgrade-modal" @click.self="showInstallGuide = false">
+      <div class="upgrade-content">
+        <div class="upgrade-header">
+          <h3>客户端管理指南</h3>
+          <button class="btn-close" @click="showInstallGuide = false">&times;</button>
+        </div>
+        <div class="upgrade-body">
+          <div class="guide-section">
+            <h4>安装客户端</h4>
+            <div class="code-block">
+              <code>curl -fsSL https://net.soccn.com/install.sh | bash</code>
+              <button class="btn-copy" @click="copyCmd('curl -fsSL https://net.soccn.com/install.sh | bash')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-section">
+            <h4>启动客户端</h4>
+            <div class="code-block">
+              <code>~/.netguard/start.sh</code>
+              <button class="btn-copy" @click="copyCmd('~/.netguard/start.sh')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-section">
+            <h4>停止客户端</h4>
+            <div class="code-block">
+              <code>~/.netguard/stop.sh</code>
+              <button class="btn-copy" @click="copyCmd('~/.netguard/stop.sh')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-section">
+            <h4>卸载客户端</h4>
+            <div class="code-block">
+              <code>~/.netguard/uninstall.sh</code>
+              <button class="btn-copy" @click="copyCmd('~/.netguard/uninstall.sh')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-section">
+            <h4>查看状态</h4>
+            <div class="code-block">
+              <code>~/.netguard/status.sh</code>
+              <button class="btn-copy" @click="copyCmd('~/.netguard/status.sh')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-section">
+            <h4>升级客户端</h4>
+            <div class="code-block">
+              <code>curl -fsSL https://net.soccn.com/upgrade.sh | bash</code>
+              <button class="btn-copy" @click="copyCmd('curl -fsSL https://net.soccn.com/upgrade.sh | bash')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -90,7 +187,8 @@ export default {
   data() {
     return {
       upgradeClient: null,
-      currentVersion: '0.4.0', // 当前最新版本
+      showInstallGuide: false,
+      currentVersion: '0.4.0',
     }
   },
   methods: {
@@ -111,8 +209,7 @@ export default {
     showUpgradeGuide(client) {
       this.upgradeClient = client
     },
-    copyUpgradeCmd() {
-      const cmd = 'curl -fsSL https://net.soccn.com/upgrade.sh | bash'
+    copyCmd(cmd) {
       navigator.clipboard.writeText(cmd)
     }
   }
@@ -128,12 +225,39 @@ export default {
   margin-bottom: var(--space-lg);
 }
 
+.client-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
 .client-title {
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
   color: var(--color-ink-muted);
-  margin-bottom: var(--space-sm);
+  margin: 0;
+}
+
+.btn-info {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-ink-subtle);
+  transition: all var(--transition-fast);
+}
+
+.btn-info:hover {
+  background: var(--color-surface-3);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .client-empty {
@@ -361,5 +485,16 @@ export default {
 .btn-copy:hover {
   background: var(--color-surface-3);
   color: var(--color-primary);
+}
+
+.guide-section {
+  margin-bottom: var(--space-lg);
+}
+
+.guide-section h4 {
+  margin: 0 0 var(--space-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
 }
 </style>

@@ -68,12 +68,16 @@ def sync_heartbeat(body: dict):
         client.is_online = True
         db.commit()
 
-        if client_id not in manager._client_info:
-            manager._client_info[client_id] = {
-                "hostname": client.hostname,
-                "ip_address": client.ip_address,
-                "platform": client.platform,
-            }
+        # 始终更新 _client_info，确保前端获取最新数据
+        manager._client_info[client_id] = {
+            "hostname": client.hostname,
+            "ip_address": client.ip_address,
+            "platform": client.platform,
+            "version": client.version,
+            "device_count": client.device_count,
+            "online_count": client.online_count,
+            "is_online": True,
+        }
 
         return {"status": "ok", "server_time": datetime.now().isoformat()}
     finally:
