@@ -736,3 +736,189 @@ def scan_browser(body: dict, db: Session = Depends(get_db)):
 
     db.commit()
     return {"device_count": scanned, "new_device_count": new_count, "alerts_created": alerts_created}
+
+
+# In-memory scan status tracking
+_scan_status = {}
+
+
+@router.post("/scan-subnet")
+def scan_subnet(body: dict, db: Session = Depends(get_db)):
+    """
+    Scan a specific subnet from the browser.
+    The frontend detects the local IP via WebRTC, then calls this endpoint
+    to perform a real ARP scan on the server side.
+    """
+    import uuid
+    import threading
+
+    subnet = body.get("subnet", "")
+    client_ip = body.get("client_ip", "")
+
+    if not subnet:
+        raise HTTPException(status_code=400, detail="subnet is required (e.g. 192.168.1.0/24)")
+
+    # Ensure subnet ends with /24
+    if not subnet.endswith("/24"):
+        ip_parts = subnet.split(".")
+        if len(ip_parts) == 4:
+            subnet = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.0/24"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid subnet format")
+
+    scan_id = str(uuid.uuid4())
+    _scan_status[scan_id] = {"status": "running", "subnet": subnet, "device_count": 0, "new_device_count": 0}
+
+    def _do_scan():
+        try:
+            from app.database import SessionLocal
+            from app.services.platform_compat import get_arp_table, ping_host
+            from app.services.hostname_resolver import HostnameResolver
+            from app.services.vendor_lookup import VendorLookup
+            
+            db_session = SessionLocal()
+            try:
+                existing_devices = db_session.query(Device).all()
+                existing_ips = {d.ip_address: d for d in existing_devices}
+                existing_macs = {d.mac_address.upper(): d for d in existing_devices if d.mac_address}
+
+                # Step 1: Ping all IPs in the subnet to populate ARP table
+                import subprocess
+                ip_parts = subnet.split(".")
+                subnet_prefix = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}"
+                
+                # Ping all IPs in parallel (fast, 0.5s timeout each)
+                ping_ips = [f"{subnet_prefix}.{i}" for i in range(1, 255)]
+                try:
+                    # Use macOS ping -c 1 -t 0.5 for fast ping
+                    proc = subprocess.Popen(
+                        ["ping", "-c", "1", "-t", "0.3"] + ping_ips[:50],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    proc.wait(timeout=20)
+                except Exception:
+                    pass
+
+                # Step 2: Read ARP table (no root needed)
+                arp_devices = get_arp_table()
+                
+                # Filter to only the requested subnet
+                subnet_devices = [
+                    d for d in arp_devices 
+                    if d["ip_address"].startswith(subnet_prefix)
+                ]
+
+                hostname_resolver = HostnameResolver(timeout=1.0)
+                vendor_lookup = VendorLookup()
+                
+                new_count = 0
+                scanned = 0
+                alerts_created = 0
+
+                for dev_data in subnet_devices:
+                    mac = dev_data.get("mac_address", "")
+                    ip = dev_data.get("ip_address", "")
+                    if not ip or not mac:
+                        continue
+
+                    scanned += 1
+
+                    # Fast hostname lookup
+                    try:
+                        hostname_result = hostname_resolver.resolve(ip)
+                    except Exception:
+                        hostname_result = {"hostname": "", "source": ""}
+                    hostname = hostname_result.get("hostname", "")
+                    hostname_source = hostname_result.get("source", "")
+                    vendor = vendor_lookup.lookup(mac)
+                    device_type = vendor_lookup.get_device_type_from_mac(mac) or "unknown"
+                    risk_level = "LOW"
+
+                    # Check if device already exists
+                    existing = None
+                    if mac:
+                        existing = existing_macs.get(mac.upper())
+                    if not existing:
+                        existing = existing_ips.get(ip)
+
+                    if existing:
+                        existing.last_seen = func.now()
+                        existing.mac_address = mac
+                        existing.mac_prefix = mac[:8]
+                        existing.ip_address = ip
+                        if hostname:
+                            existing.hostname = hostname
+                            existing.hostname_source = hostname_source
+                        if vendor:
+                            existing.vendor = vendor
+                        if device_type and device_type != "unknown":
+                            existing.device_type = device_type
+                        existing.scan_source = "browser"
+                        device_id = existing.id
+                    else:
+                        new_device = Device(
+                            mac_address=mac,
+                            mac_prefix=mac[:8],
+                            vendor=vendor,
+                            device_type=device_type,
+                            ip_address=ip,
+                            hostname=hostname,
+                            hostname_source=hostname_source,
+                            risk_level=risk_level,
+                            scan_source="browser",
+                        )
+                        db_session.add(new_device)
+                        db_session.flush()
+                        device_id = new_device.id
+                        new_count += 1
+
+                    if risk_level in ("HIGH", "CRITICAL"):
+                        hostname_display = hostname or "--"
+                        vendor_display = vendor or "未知厂商"
+                        message = f"发现高风险设备: {device_type} ({vendor_display}) IP: {ip} 主机名: {hostname_display}"
+                        try:
+                            alerter.create_alert(
+                                device_id=device_id,
+                                alert_type="high_risk_device",
+                                severity="WARNING" if risk_level == "HIGH" else "CRITICAL",
+                                message=message,
+                            )
+                            alerts_created += 1
+                        except Exception:
+                            pass
+
+                    try:
+                        db_session.commit()
+                    except Exception:
+                        db_session.rollback()
+
+                _scan_status[scan_id] = {
+                    "status": "complete",
+                    "subnet": subnet,
+                    "device_count": scanned,
+                    "new_device_count": new_count,
+                    "alerts_created": alerts_created
+                }
+            finally:
+                db_session.close()
+        except Exception as e:
+            _scan_status[scan_id] = {"status": "error", "message": str(e)}
+
+    thread = threading.Thread(target=_do_scan, daemon=True)
+    thread.start()
+
+    return {
+        "scan_id": scan_id,
+        "subnet": subnet,
+        "status": "running"
+    }
+
+
+@router.get("/scan-subnet/{scan_id}")
+def get_scan_status(scan_id: str):
+    """Check the status of a subnet scan."""
+    status = _scan_status.get(scan_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return status

@@ -21,7 +21,7 @@ class NetworkScanner:
         return ":".join(p.zfill(2).upper() for p in parts)
 
     def scan_network(self, network: Optional[str] = None) -> List[Dict]:
-        arp_devices = self._arp_table()
+        arp_devices = self._arp_table(network)
         devices = []
         for d in arp_devices:
             hostname_result = self.hostname_resolver.resolve(d["ip_address"])
@@ -37,10 +37,29 @@ class NetworkScanner:
             })
         return devices
 
-    def _arp_table(self) -> List[Dict]:
+    def _arp_table(self, network: Optional[str] = None) -> List[Dict]:
         devices = []
         seen = set()
 
+        # If a specific network is provided, scan it
+        if network:
+            try:
+                from scapy.all import ARP, Ether, srp
+                arp_results = Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=network)
+                answered, _ = srp(arp_results, timeout=2, verbose=False)
+                for sent, received in answered:
+                    ip = received.psrc
+                    mac = self.normalize_mac(received.hwsrc)
+                    if ip not in seen:
+                        seen.add(ip)
+                        devices.append({"ip_address": ip, "mac_address": mac})
+            except Exception:
+                pass
+            
+            if devices:
+                return devices
+
+        # Default: scan hardcoded subnets
         try:
             from scapy.all import ARP, Ether, srp
             arp_results = Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst="192.168.100.0/24")

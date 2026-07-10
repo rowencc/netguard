@@ -1,7 +1,9 @@
 /**
  * 浏览器本地网络扫描器
- * 通过 WebRTC 获取本地 IP，然后尝试探测局域网设备
+ * 通过 WebRTC 获取本地 IP，然后调用后端 API 执行真正的 ARP 扫描
  */
+
+import api from '@/api'
 
 export class BrowserScanner {
   constructor() {
@@ -23,7 +25,6 @@ export class BrowserScanner {
         pc.onicecandidate = (event) => {
           if (!event.candidate) {
             pc.close()
-            // 选择非回环的 IPv4 地址
             const localIP = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.'))
             resolve(localIP || ips[0] || null)
             return
@@ -40,7 +41,6 @@ export class BrowserScanner {
           reject(new Error('Failed to get local IP'))
         }
 
-        // 超时处理
         setTimeout(() => {
           pc.close()
           const localIP = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.'))
@@ -61,74 +61,47 @@ export class BrowserScanner {
   }
 
   /**
-   * 通过探测常见端口来发现设备
-   * 使用多种方法提高可靠性
+   * 轮询扫描状态
    */
-  async probeDevice(ip, timeout = 1000) {
-    const commonPorts = [80, 443, 8080, 8443, 554, 8000, 8888]
-    const foundPorts = []
+  async pollScanStatus(scanId, onProgress) {
+    const maxPolls = 120 // 最多轮询 120 次 (约 2 分钟)
+    const pollInterval = 1000 // 每秒轮询一次
 
-    // Method 1: Image loading (works for HTTP servers)
-    const imageProbePromises = commonPorts.map(port => {
-      return new Promise((resolve) => {
-        const img = new Image()
-        const timer = setTimeout(() => {
-          resolve(null)
-        }, timeout)
+    for (let i = 0; i < maxPolls; i++) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval))
 
-        img.onload = () => {
-          clearTimeout(timer)
-          resolve(port)
-        }
-        img.onerror = () => {
-          clearTimeout(timer)
-          // onerror also indicates port is open (server returned non-image content)
-          resolve(port)
+      try {
+        const response = await api.get(`/devices/scan-subnet/${scanId}`)
+        const status = response.data
+
+        if (status.status === 'complete') {
+          return status
+        } else if (status.status === 'error') {
+          throw new Error(status.message || '扫描失败')
         }
 
-        img.src = `http://${ip}:${port}/favicon.ico?_=${Date.now()}`
-      })
-    })
-
-    // Method 2: Fetch API with no-cors (more reliable for HTTPS)
-    const fetchProbePromises = commonPorts.map(port => {
-      return new Promise((resolve) => {
-        const timer = setTimeout(() => {
-          resolve(null)
-        }, timeout)
-
-        fetch(`http://${ip}:${port}/`, {
-          method: 'HEAD',
-          mode: 'no-cors',
-          signal: AbortSignal.timeout(timeout)
+        // 仍在运行中，更新进度
+        const progress = Math.min(90, 10 + Math.round((i / maxPolls) * 80))
+        onProgress({
+          status: 'scanning',
+          message: `正在扫描网络... (${i + 1}s)`,
+          progress
         })
-          .then(() => {
-            clearTimeout(timer)
-            resolve(port)
-          })
-          .catch(() => {
-            clearTimeout(timer)
-            resolve(null)
-          })
-      })
-    })
+      } catch (e) {
+        if (e.response && e.response.status === 404) {
+          // 扫描ID还没创建，继续等待
+          continue
+        }
+        throw e
+      }
+    }
 
-    // Run both methods in parallel
-    const [imageResults, fetchResults] = await Promise.all([
-      Promise.all(imageProbePromises),
-      Promise.all(fetchProbePromises)
-    ])
-
-    // Combine results
-    const allPorts = new Set()
-    imageResults.filter(Boolean).forEach(p => allPorts.add(p))
-    fetchResults.filter(Boolean).forEach(p => allPorts.add(p))
-
-    return Array.from(allPorts)
+    throw new Error('扫描超时')
   }
 
   /**
    * 扫描本地网络
+   * 通过 WebRTC 获取本地 IP，然后调用后端 API 执行真正的 ARP 扫描
    * @param {function} onDeviceFound - 发现设备时的回调
    * @param {function} onProgress - 进度回调
    */
@@ -143,96 +116,70 @@ export class BrowserScanner {
       }
 
       this.subnet = this.getSubnet(this.localIP)
-      onProgress({ 
-        status: 'scanning', 
-        localIP: this.localIP, 
+      const subnetCidr = `${this.subnet}.0/24`
+
+      onProgress({
+        status: 'scanning',
+        localIP: this.localIP,
         subnet: this.subnet,
-        message: `检测到本地网络: ${this.subnet}.0/24`
+        message: `检测到本地网络: ${subnetCidr}，正在启动扫描...`,
+        progress: 5
       })
 
-      // 扫描当前 IP（本机）
-      onProgress({ status: 'scanning', message: '正在扫描本机...', progress: 0 })
-      const localPorts = await this.probeDevice(this.localIP)
-      if (localPorts.length > 0) {
+      // 启动后端扫描（异步）
+      const response = await api.post('/devices/scan-subnet', {
+        subnet: subnetCidr,
+        client_ip: this.localIP
+      })
+
+      const { scan_id } = response.data
+
+      onProgress({
+        status: 'scanning',
+        message: '网络扫描已启动，正在等待结果...',
+        progress: 10
+      })
+
+      // 轮询扫描状态
+      const result = await this.pollScanStatus(scan_id, onProgress)
+
+      onProgress({
+        status: 'scanning',
+        message: `扫描完成，正在加载设备列表...`,
+        progress: 95
+      })
+
+      // 从数据库获取最新的设备列表
+      const devicesResponse = await api.get('/devices/')
+      const allDevices = devicesResponse.data
+
+      const subnetPrefix = this.subnet
+      const scannedDevices = allDevices.filter(d =>
+        d.ip_address.startsWith(subnetPrefix) &&
+        d.scan_source === 'browser'
+      )
+
+      scannedDevices.forEach(device => {
         onDeviceFound({
-          ip_address: this.localIP,
-          mac_address: '',
-          hostname: window.location.hostname || '本机',
-          device_type: 'computer',
-          ports: localPorts,
+          ip_address: device.ip_address,
+          mac_address: device.mac_address,
+          hostname: device.hostname || '',
+          device_type: device.device_type || 'unknown',
+          vendor: device.vendor || '',
+          ports: [],
           source: 'browser'
         })
-      }
+      })
 
-      // 扫描网关
-      const gateway = `${this.subnet}.1`
-      if (gateway !== this.localIP) {
-        onProgress({ status: 'scanning', message: '正在扫描网关...', progress: 1 })
-        const gatewayPorts = await this.probeDevice(gateway)
-        if (gatewayPorts.length > 0) {
-          onDeviceFound({
-            ip_address: gateway,
-            mac_address: '',
-            hostname: 'gateway',
-            device_type: 'router',
-            ports: gatewayPorts,
-            source: 'browser'
-          })
-        }
-      }
+      onProgress({
+        status: 'complete',
+        message: `扫描完成！发现 ${result.device_count} 台设备，新增 ${result.new_device_count} 台`
+      })
 
-      // 并行扫描子网中的常见 IP
-      const scanRange = []
-      for (let i = 2; i <= 254; i++) {
-        scanRange.push(`${this.subnet}.${i}`)
-      }
-
-      // 分批扫描，每批 10 个 IP (smaller batch for better progress updates)
-      const batchSize = 10
-      const totalBatches = Math.ceil(scanRange.length / batchSize)
-      
-      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-        const startIdx = batchIndex * batchSize
-        const batch = scanRange.slice(startIdx, startIdx + batchSize)
-        const progress = Math.round((batchIndex / totalBatches) * 100)
-        
-        onProgress({ 
-          status: 'scanning', 
-          progress, 
-          current: startIdx + batch.length, 
-          total: scanRange.length,
-          message: `正在扫描第 ${batchIndex + 1}/${totalBatches} 批...`
-        })
-
-        const batchResults = await Promise.all(
-          batch.map(async (ip) => {
-            if (ip === this.localIP || ip === gateway) return null
-            try {
-              const ports = await this.probeDevice(ip, 800)
-              if (ports.length > 0) {
-                return {
-                  ip_address: ip,
-                  mac_address: '',
-                  hostname: '',
-                  device_type: 'unknown',
-                  ports,
-                  source: 'browser'
-                }
-              }
-            } catch (e) {
-              // Ignore errors for individual IPs
-            }
-            return null
-          })
-        )
-
-        batchResults.filter(Boolean).forEach(device => onDeviceFound(device))
-      }
-
-      onProgress({ status: 'complete', message: '扫描完成' })
       return true
     } catch (e) {
-      onProgress({ status: 'error', message: e.message })
+      console.error('[BrowserScanner] Error:', e)
+      onProgress({ status: 'error', message: e.message || '扫描失败' })
       return false
     }
   }
