@@ -132,30 +132,7 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
 def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
     existing_devices = db.query(Device).all()
     existing_ips = {d.ip_address: d for d in existing_devices}
-
-    import threading
-    def _bg_resolve(devices_list):
-        from app.database import SessionLocal
-        bg_db = SessionLocal()
-        try:
-            for dev in devices_list:
-                d = bg_db.query(Device).filter(Device.id == dev.id).first()
-                if not d:
-                    continue
-                result = hostname_resolver.resolve(d.ip_address)
-                hostname = result.get("hostname", "")
-                if hostname and (not d.hostname or d.hostname_source in ("", "dns")):
-                    d.hostname = hostname
-                    d.hostname_source = result.get("source", "")
-            bg_db.commit()
-        except Exception:
-            bg_db.rollback()
-        finally:
-            bg_db.close()
-
-    no_hostname = [d for d in existing_devices if not d.hostname]
-    if no_hostname:
-        threading.Thread(target=_bg_resolve, args=(no_hostname,), daemon=True).start()
+    existing_macs = {d.mac_address.upper(): d for d in existing_devices if d.mac_address}
 
     devices = scanner.scan_network(network)
     new_count = 0
@@ -163,33 +140,30 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
     alerts_created = 0
     for dev_data in devices:
         mac = dev_data.get("mac_address", "")
-        if not mac:
+        ip = dev_data.get("ip_address", "")
+        if not mac or not ip:
             continue
         scanned += 1
-        identified = identifier.identify_device(dev_data)
-        ip = dev_data["ip_address"]
-        vendor = identified.get("vendor", "")
-        device_type = identified.get("device_type", "unknown")
-        risk_level = identified.get("risk_level", "LOW")
+        vendor = dev_data.get("vendor", "")
+        device_type = dev_data.get("device_type_hint", "unknown")
         hostname = dev_data.get("hostname", "")
         hostname_source = dev_data.get("hostname_source", "")
 
-        existing = existing_ips.get(ip)
+        existing = existing_macs.get(mac.upper()) or existing_ips.get(ip)
         if existing:
             existing.last_seen = func.now()
-            existing.mac_address = mac
-            existing.mac_prefix = mac[:8]
             existing.ip_address = ip
+            if mac:
+                existing.mac_address = mac
+                existing.mac_prefix = mac[:8]
             if hostname:
                 existing.hostname = hostname
                 existing.hostname_source = hostname_source
             if vendor:
                 existing.vendor = vendor
-            if device_type:
+            if device_type and device_type != "unknown":
                 existing.device_type = device_type
-            if risk_level:
-                existing.risk_level = risk_level
-            device_id = existing.id
+            existing.scan_source = "server"
         else:
             new_device = Device(
                 mac_address=mac,
@@ -199,28 +173,12 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
                 ip_address=ip,
                 hostname=hostname,
                 hostname_source=hostname_source,
-                os_info=identified.get("device_model", ""),
-                risk_level=risk_level,
-                is_authorized=False
+                risk_level="LOW",
+                is_authorized=False,
+                scan_source="server",
             )
             db.add(new_device)
-            db.flush()
-            device_id = new_device.id
             new_count += 1
-
-        if risk_level in ("HIGH", "CRITICAL"):
-            hostname_display = hostname or "--"
-            vendor_display = vendor or "未知厂商"
-            type_display = device_type
-            severity = "CRITICAL" if risk_level == "CRITICAL" else "WARNING"
-            message = f"发现高风险设备: {type_display} ({vendor_display}) IP: {ip} 主机名: {hostname_display}"
-            alerter.create_alert(
-                device_id=device_id,
-                alert_type="high_risk_device",
-                severity=severity,
-                message=message
-            )
-            alerts_created += 1
     db.commit()
     return {"device_count": scanned, "new_device_count": new_count, "alerts_created": alerts_created}
 

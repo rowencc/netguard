@@ -27,14 +27,14 @@ class NetworkScanner:
         arp_devices = self._arp_table(network)
         devices = []
         for d in arp_devices:
-            hostname_result = self.hostname_resolver.resolve(d["ip_address"])
+            # Skip slow hostname resolution for speed
             vendor = self.vendor_lookup.lookup(d["mac_address"])
             device_type = self.vendor_lookup.get_device_type_from_mac(d["mac_address"])
             devices.append({
                 "ip_address": d["ip_address"],
                 "mac_address": d["mac_address"],
-                "hostname": hostname_result.get("hostname", ""),
-                "hostname_source": hostname_result.get("source", ""),
+                "hostname": "",
+                "hostname_source": "",
                 "vendor": vendor,
                 "device_type_hint": device_type
             })
@@ -50,9 +50,7 @@ class NetworkScanner:
         if network:
             subnets = [network]
         else:
-            # Scan all known subnets
-            subnets = ["192.168.100.0/24", "192.168.101.0/24", "192.168.103.0/24"]
-            # Also scan the local subnet
+            # Only scan the local subnet for speed
             try:
                 info = get_network_info()
                 local_ip = info.get("local_ip", "")
@@ -60,28 +58,21 @@ class NetworkScanner:
                     parts = local_ip.split(".")
                     if len(parts) == 4:
                         local_subnet = f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
-                        if local_subnet not in subnets:
-                            subnets.insert(0, local_subnet)
+                        subnets.append(local_subnet)
             except Exception:
                 pass
+            # Fallback to common subnets
+            if not subnets:
+                subnets = ["192.168.103.0/24"]
         
         def ping_host(ip):
             try:
-                import sys
-                if sys.platform == "darwin":
-                    subprocess.run(
-                        ["ping", "-c", "1", "-W", "0.3", ip],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        timeout=1
-                    )
-                else:
-                    subprocess.run(
-                        ["ping", "-c", "1", "-W", "0.3", ip],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        timeout=1
-                    )
+                subprocess.run(
+                    ["ping", "-c", "1", "-W", "0.2", ip],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=0.5
+                )
             except Exception:
                 pass
         
@@ -94,67 +85,22 @@ class NetworkScanner:
                 for i in range(1, 255):
                     all_ips.append(f"{prefix}.{i}")
         
-        # Ping in parallel (50 concurrent)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+        # Ping in parallel (100 concurrent for speed)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
             executor.map(ping_host, all_ips)
 
     def _arp_table(self, network: Optional[str] = None) -> List[Dict]:
         devices = []
         seen = set()
 
-        # If a specific network is provided, scan it
-        if network:
-            try:
-                from scapy.all import ARP, Ether, srp
-                arp_results = Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=network)
-                answered, _ = srp(arp_results, timeout=2, verbose=False)
-                for sent, received in answered:
-                    ip = received.psrc
-                    mac = self.normalize_mac(received.hwsrc)
-                    if ip not in seen:
-                        seen.add(ip)
-                        devices.append({"ip_address": ip, "mac_address": mac})
-            except Exception:
-                pass
-            
-            if devices:
-                return devices
-
-        # Default: scan hardcoded subnets
-        try:
-            from scapy.all import ARP, Ether, srp
-            arp_results = Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst="192.168.100.0/24")
-            answered, _ = srp(arp_results, timeout=2, verbose=False)
-            for sent, received in answered:
-                ip = received.psrc
-                mac = self.normalize_mac(received.hwsrc)
-                if ip not in seen:
-                    seen.add(ip)
-                    devices.append({"ip_address": ip, "mac_address": mac})
-        except Exception:
-            pass
-
-        try:
-            from scapy.all import ARP, Ether, srp
-            arp_results = Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst="192.168.101.0/24")
-            answered, _ = srp(arp_results, timeout=2, verbose=False)
-            for sent, received in answered:
-                ip = received.psrc
-                mac = self.normalize_mac(received.hwsrc)
-                if ip not in seen:
-                    seen.add(ip)
-                    devices.append({"ip_address": ip, "mac_address": mac})
-        except Exception:
-            pass
-
-        if devices:
-            return devices
-
+        # Skip scapy (requires root) - use system ARP table directly
+        # The ping sweep has already populated the ARP table
+        
         arp_table = get_arp_table()
         for entry in arp_table:
             ip = entry["ip_address"]
             mac = self.normalize_mac(entry["mac_address"])
-            if ip not in seen:
+            if ip not in seen and not ip.startswith("127."):
                 seen.add(ip)
                 devices.append({"ip_address": ip, "mac_address": mac})
 
