@@ -396,10 +396,13 @@ export default {
           this.matchCurrent = i + 1
           this.matchPercent = Math.round((this.matchCurrent / this.matchTotal) * 100)
           
+          const vendor = d.vendor || ''
+          const deviceType = d.device_type || 'unknown'
+          
           this.matchLog.unshift({
-            ip: d.ip_address,
-            type: d.device_type || 'unknown',
-            vendor: d.vendor || '',
+            ip: d.ip_address || '',
+            type: deviceType,
+            vendor: vendor,
             isNew: d.mac_address && d.mac_address.startsWith('02:'),
           })
           

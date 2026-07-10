@@ -153,6 +153,7 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
         'tv': ['tv', 'samsung tv', 'lg tv', 'sony tv', 'xiaomi tv', 'tcl'],
         'speaker': ['speaker', 'sonos', 'homepod', 'echo', 'google home'],
         'computer': ['computer', 'laptop', 'desktop', 'macbook', 'dell inc.', 'lenovo', 'asus', 'acer'],
+        'iot': ['espressif', 'iot', 'smart', 'sensor', 'tuya'],
     }
 
     for dev_data in devices:
@@ -160,6 +161,19 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
         ip = dev_data.get("ip_address", "")
         if not mac or not ip:
             continue
+        
+        # 过滤多播/广播地址
+        if ip.startswith(('224.', '225.', '226.', '227.', '228.', '229.', '230.', '231.', '232.', '233.', '234.', '235.', '236.', '237.', '238.', '239.', '255.')):
+            continue
+        # 过滤回环地址
+        if ip.startswith('127.'):
+            continue
+        
+        # 过滤本地管理 MAC（第2位为2,6,A,E的）
+        mac_first = int(mac[1], 16) if len(mac) >= 2 else 0
+        if mac_first & 2:  # 本地管理位
+            continue
+        
         scanned += 1
         vendor = dev_data.get("vendor", "")
         device_type = dev_data.get("device_type_hint", "unknown")
