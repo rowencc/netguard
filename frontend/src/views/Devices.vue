@@ -367,7 +367,7 @@ export default {
       return this.devices
     },
     hasClient() {
-      return this.wsClients.length > 0
+      return this.wsClients.some(c => c.is_online)
     }
   },
   mounted() {
@@ -514,8 +514,8 @@ export default {
       this.devices = []
       this.scanMode = ''
 
-      // 优先使用客户端代理扫描（本地网络）
-      const targetClientId = this.selectedClientId || (this.wsClients.length > 0 ? this.wsClients[0].client_id : '')
+      // 优先使用客户端代理扫描（本地网络）- 只选择在线的客户端
+      const targetClientId = this.selectedClientId || (this.wsClients.length > 0 ? this.wsClients.find(c => c.is_online)?.client_id || '' : '')
       if (targetClientId) {
         this.scanMode = 'client'
         try {
@@ -529,7 +529,7 @@ export default {
         }
       }
 
-      // 没有客户端代理时，使用浏览器本地扫描
+      // 没有在线客户端代理时，使用浏览器本地扫描
       this.scanMode = 'browser'
       await this.scanWithBrowser()
     },
