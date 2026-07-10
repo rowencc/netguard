@@ -94,6 +94,29 @@ def normalize_mac(mac: str) -> str:
         return mac
     return ":".join(p.zfill(2) for p in parts)
 
+# 厂商名 → 设备类型 映射
+VENDOR_TYPE_KEYWORDS = {
+    'router': ['router', 'gateway', 'h3c', 'cisco', 'tp-link', 'mercury', 'd-link', 'netgear', 'tenda', 'huawei', 'mikrotik'],
+    'camera': ['camera', 'hikvision', 'dahua', 'uniview', 'tiandy', 'xiaomi camera'],
+    'switch': ['switch', 'aruba', 'hpe', 'dell networking'],
+    'printer': ['printer', 'ricoh', 'canon', 'hp inc.', 'epson', 'brother', 'xerox'],
+    'phone': ['phone', 'iphone', 'samsung', 'huawei mobile', 'xiaomi mobile', 'oppo', 'vivo'],
+    'tv': ['tv', 'samsung tv', 'lg tv', 'sony tv', 'xiaomi tv', 'tcl'],
+    'speaker': ['speaker', 'sonos', 'homepod', 'echo', 'google home'],
+    'computer': ['computer', 'laptop', 'desktop', 'macbook', 'dell inc.', 'lenovo', 'asus', 'acer'],
+}
+
+def infer_device_type(vendor: str, current_type: str = "unknown") -> str:
+    if current_type and current_type != "unknown":
+        return current_type
+    if not vendor:
+        return current_type
+    vendor_lower = vendor.lower()
+    for dtype, keywords in VENDOR_TYPE_KEYWORDS.items():
+        if any(kw in vendor_lower for kw in keywords):
+            return dtype
+    return current_type
+
 
 @app.post("/api/sync/report-devices")
 def sync_report_devices(devices: list = Body(..., embed=False)):
@@ -303,12 +326,20 @@ async def ws_client(websocket: WebSocket, client_id: str):
                 db = SessionLocal()
                 try:
                     mac = device_data.get("mac_address", "").upper()
+                    vendor = device_data.get("vendor", "")
+                    device_type = device_data.get("device_type", "unknown")
+                    
+                    # 从厂商名推断设备类型
+                    device_type = infer_device_type(vendor, device_type)
+                    
                     existing = db.query(Device).filter(Device.mac_address == mac).first()
                     if existing:
                         existing.ip_address = device_data.get("ip_address", existing.ip_address)
                         existing.hostname = device_data.get("hostname") or existing.hostname
-                        existing.vendor = device_data.get("vendor") or existing.vendor
-                        existing.device_type = device_data.get("device_type") or existing.device_type
+                        if vendor:
+                            existing.vendor = vendor
+                        if device_type and device_type != "unknown":
+                            existing.device_type = device_type
                         existing.risk_level = device_data.get("risk_level", existing.risk_level)
                         existing.last_seen = func.now()
                         existing.client_id = client_id
@@ -320,8 +351,8 @@ async def ws_client(websocket: WebSocket, client_id: str):
                             mac_prefix=mac_prefix,
                             ip_address=device_data.get("ip_address", ""),
                             hostname=device_data.get("hostname", ""),
-                            vendor=device_data.get("vendor", ""),
-                            device_type=device_data.get("device_type", "unknown"),
+                            vendor=vendor,
+                            device_type=device_type,
                             risk_level=device_data.get("risk_level", "LOW"),
                             client_id=client_id,
                             scan_source="client",

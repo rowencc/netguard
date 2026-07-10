@@ -142,6 +142,19 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
     devices = scanner.scan_network(network)
     new_count = 0
     scanned = 0
+    
+    # 厂商名 → 设备类型 映射
+    type_keywords = {
+        'router': ['router', 'gateway', 'h3c', 'cisco', 'tp-link', 'mercury', 'd-link', 'netgear', 'tenda', 'huawei', 'mikrotik'],
+        'camera': ['camera', 'hikvision', 'dahua', 'uniview', 'tiandy', 'xiaomi camera'],
+        'switch': ['switch', 'aruba', 'hpe', 'dell networking'],
+        'printer': ['printer', 'ricoh', 'canon', 'hp inc.', 'epson', 'brother', 'xerox'],
+        'phone': ['phone', 'iphone', 'samsung', 'huawei mobile', 'xiaomi mobile', 'oppo', 'vivo'],
+        'tv': ['tv', 'samsung tv', 'lg tv', 'sony tv', 'xiaomi tv', 'tcl'],
+        'speaker': ['speaker', 'sonos', 'homepod', 'echo', 'google home'],
+        'computer': ['computer', 'laptop', 'desktop', 'macbook', 'dell inc.', 'lenovo', 'asus', 'acer'],
+    }
+
     for dev_data in devices:
         mac = dev_data.get("mac_address", "")
         ip = dev_data.get("ip_address", "")
@@ -161,6 +174,14 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
             device_type = learned_type
         if learned_vendor:
             vendor = learned_vendor
+
+        # 如果设备类型未知，从厂商名推断
+        if device_type == "unknown" and vendor:
+            vendor_lower = vendor.lower()
+            for dtype, keywords in type_keywords.items():
+                if any(kw in vendor_lower for kw in keywords):
+                    device_type = dtype
+                    break
 
         new_device = Device(
             mac_address=mac,
