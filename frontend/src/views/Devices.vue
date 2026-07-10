@@ -395,6 +395,7 @@ export default {
   methods: {
     onScanStart() {
       this.devices = []
+      this.scanDevices = []
       this.loading = true
     },
     handleWsMessage(data) {
