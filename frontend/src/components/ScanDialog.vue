@@ -102,7 +102,7 @@
             </div>
 
             <!-- 扫描结果 -->
-            <div v-if="scanComplete" class="scan-results">
+            <div v-if="scanComplete && !matching" class="scan-results">
               <div class="results-summary">
                 <div class="result-stat">
                   <span class="stat-value">{{ resultCount }}</span>
@@ -118,6 +118,27 @@
                 </div>
               </div>
               <p class="results-hint">设备已自动保存到设备列表</p>
+            </div>
+
+            <!-- 指纹匹配动画 -->
+            <div v-if="matching" class="match-progress">
+              <div class="match-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="match-spin">
+                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <p class="match-title">正在匹配指纹库...</p>
+              <p class="match-detail">已匹配 {{ matchCurrent }}/{{ matchTotal }} 台设备</p>
+              <div class="match-bar">
+                <div class="match-bar-fill" :style="{ width: matchPercent + '%' }"></div>
+              </div>
+              <div class="match-list">
+                <div v-for="(item, idx) in matchLog" :key="idx" class="match-item" :class="{ 'match-new': item.isNew }">
+                  <span class="match-ip">{{ item.ip }}</span>
+                  <span class="match-type">{{ item.type }}</span>
+                  <span v-if="item.vendor" class="match-vendor">{{ item.vendor }}</span>
+                </div>
+              </div>
             </div>
 
             <!-- 错误状态 -->
@@ -181,6 +202,11 @@ export default {
       newCount: 0,
       alertCount: 0,
       scanId: null,
+      matching: false,
+      matchCurrent: 0,
+      matchTotal: 0,
+      matchPercent: 0,
+      matchLog: [],
     }
   },
   computed: {
@@ -265,7 +291,7 @@ export default {
         this.alertCount = res.data.alerts_created || 0
         this.scanProgress = { status: 'complete', progress: 100, message: '扫描完成' }
         this.scanComplete = true
-        this.$emit('scan-complete')
+        await this.startMatching()
       } catch (e) {
         clearInterval(progressTimer)
         throw new Error(e.response?.data?.detail || '服务端扫描失败')
@@ -289,7 +315,7 @@ export default {
         // Poll for completion
         await this.pollClientScan()
         this.scanComplete = true
-        this.$emit('scan-complete')
+        await this.startMatching()
       } catch (e) {
         throw new Error(e.response?.data?.detail || '客户端扫描失败')
       }
@@ -350,9 +376,47 @@ export default {
       if (devices.length > 0) {
         this.resultCount = devices.length
         this.scanComplete = true
-        this.$emit('scan-complete')
+        await this.startMatching()
       } else {
         throw new Error('浏览器扫描未发现设备，请尝试其他扫描方式')
+      }
+    },
+    async startMatching() {
+      const api = (await import('@/api')).default
+      try {
+        const res = await api.get('/devices/')
+        const devices = res.data
+        this.matchTotal = devices.length
+        this.matching = true
+        this.matchLog = []
+        this.matchCurrent = 0
+
+        for (let i = 0; i < devices.length; i++) {
+          const d = devices[i]
+          this.matchCurrent = i + 1
+          this.matchPercent = Math.round((this.matchCurrent / this.matchTotal) * 100)
+          
+          this.matchLog.unshift({
+            ip: d.ip_address,
+            type: d.device_type || 'unknown',
+            vendor: d.vendor || '',
+            isNew: d.mac_address && d.mac_address.startsWith('02:'),
+          })
+          
+          // 保持最多显示 5 条
+          if (this.matchLog.length > 5) {
+            this.matchLog.pop()
+          }
+          
+          await new Promise(r => setTimeout(r, 80))
+        }
+
+        await new Promise(r => setTimeout(r, 500))
+        this.matching = false
+        this.$emit('scan-complete')
+      } catch (e) {
+        this.matching = false
+        this.$emit('scan-complete')
       }
     },
     cancelScan() {
@@ -739,6 +803,103 @@ export default {
 .btn-icon {
   width: 16px;
   height: 16px;
+}
+
+/* Match Progress */
+.match-progress {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.match-icon {
+  margin-bottom: 16px;
+}
+
+.match-spin {
+  width: 48px;
+  height: 48px;
+  color: var(--color-primary, #5e6ad2);
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.match-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-ink, #f7f8f8);
+}
+
+.match-detail {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-ink-subtle, #8a8f98);
+}
+
+.match-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--color-surface-2, #141516);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.match-bar-fill {
+  height: 100%;
+  background: var(--color-primary, #5e6ad2);
+  border-radius: 2px;
+  transition: width 100ms ease;
+}
+
+.match-list {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.match-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  animation: fadeIn 200ms ease;
+}
+
+.match-item.match-new {
+  background: rgba(94, 106, 210, 0.08);
+}
+
+.match-ip {
+  font-family: var(--font-mono, monospace);
+  color: var(--color-ink-muted, #d0d6e0);
+  min-width: 100px;
+}
+
+.match-type {
+  padding: 2px 8px;
+  background: var(--color-surface-2, #141516);
+  border-radius: 4px;
+  color: var(--color-ink-subtle, #8a8f98);
+}
+
+.match-vendor {
+  color: var(--color-ink-subtle, #8a8f98);
+  flex: 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Transitions */
