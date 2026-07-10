@@ -133,6 +133,9 @@ def trigger_scan(network: Optional[str] = None, db: Session = Depends(get_db)):
     from app.api.corrections import get_learned_device_type, get_learned_vendor
     
     # 清空旧设备列表（比对库 DeviceCorrection 不受影响）
+    # 先删除告警（外键约束），再删除设备
+    from app.models.alert import Alert
+    db.query(Alert).delete()
     db.query(Device).delete()
     db.commit()
 
@@ -562,6 +565,9 @@ async def scan_client(body: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Client {client_id} is not connected")
 
     # 清空旧设备列表（比对库 DeviceCorrection 不受影响）
+    # 先删除告警（外键约束），再删除设备
+    from app.models.alert import Alert
+    db.query(Alert).delete()
     db.query(Device).delete()
     db.commit()
 
