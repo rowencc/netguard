@@ -374,13 +374,13 @@ export default {
     const isRefresh = !!sessionStorage.getItem('netguard_devices_session')
     sessionStorage.setItem('netguard_devices_session', '1')
 
+    // 首次加载或刷新时都加载已有设备
+    this.loadDevices()
+
     if (isRefresh) {
-      // Refresh: clear current devices and auto-trigger scan
+      // 刷新时自动触发扫描
       this.devices = []
       this.scanNetwork()
-    } else {
-      // New session: don't load devices, show empty state
-      this.isNewSession = true
     }
 
     this.removeWsHandler = this.onMessage(this.handleWsMessage)
